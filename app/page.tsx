@@ -479,7 +479,7 @@ ${result.fullTranscript}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Label htmlFor="apiKey" className="text-[#1B1823] text-sm font-medium">
-                Assembly AI API Key
+                AssemblyAI API Key
               </Label>
               <a
                 href="https://www.assemblyai.com/"
@@ -496,7 +496,7 @@ ${result.fullTranscript}
                 <Input
                   id="apiKey"
                   type="password"
-                  placeholder="Enter your API key"
+                  placeholder="Enter your key"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   className="flex-1 h-11 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823]"
@@ -643,8 +643,8 @@ ${result.fullTranscript}
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-[#39939E] max-w-md">
                 <FileAudio className="w-16 h-16 mx-auto mb-4 opacity-40" />
-                <p className="text-lg">Upload an audio file to get started</p>
-                <p className="text-sm mt-2 opacity-70">Transcription results appear here.</p>
+                <p className="text-lg">{"Upload an audio file to start."}</p>
+                <p className="text-sm mt-2 opacity-70">{""}</p>
               </div>
             </div>
           )}
