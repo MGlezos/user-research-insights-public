@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Upload, FileAudio, Download, X, Check } from "lucide-react"
+import { storeApiKey, retrieveApiKey, clearApiKey } from "@/lib/secure-storage"
 
 type Utterance = {
   speaker: string
@@ -73,6 +74,14 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const savedKey = retrieveApiKey()
+    if (savedKey) {
+      setStoredApiKey(savedKey)
+      setIsApiKeyStored(true)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleDragEnter = (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
@@ -134,6 +143,7 @@ export default function Home() {
 
   const handleStoreApiKey = () => {
     if (apiKey.trim()) {
+      storeApiKey(apiKey)
       setStoredApiKey(apiKey)
       setIsApiKeyStored(true)
       setApiKey("")
@@ -141,6 +151,7 @@ export default function Home() {
   }
 
   const handleRemoveApiKey = () => {
+    clearApiKey()
     setStoredApiKey("")
     setIsApiKeyStored(false)
     setApiKey("")
