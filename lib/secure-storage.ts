@@ -2,6 +2,7 @@
 // Uses browser's built-in crypto API for basic encryption
 
 const STORAGE_KEY = "supersoniq_api_key"
+const GEMINI_STORAGE_KEY = "supersoniq_gemini_key"
 const ENCRYPTION_KEY = "supersoniq-insights-v1"
 
 // Simple XOR-based encryption (sufficient for localStorage protection)
@@ -46,5 +47,29 @@ export function retrieveApiKey(): string {
 export function clearApiKey(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY)
+  }
+}
+
+// Gemini API Key functions
+export function storeGeminiKey(apiKey: string): void {
+  if (typeof window !== "undefined") {
+    const encrypted = encrypt(apiKey)
+    localStorage.setItem(GEMINI_STORAGE_KEY, encrypted)
+  }
+}
+
+export function retrieveGeminiKey(): string {
+  if (typeof window !== "undefined") {
+    const encrypted = localStorage.getItem(GEMINI_STORAGE_KEY)
+    if (encrypted) {
+      return decrypt(encrypted)
+    }
+  }
+  return ""
+}
+
+export function clearGeminiKey(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(GEMINI_STORAGE_KEY)
   }
 }

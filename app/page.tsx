@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Upload, FileAudio, Download, X, Check } from "lucide-react"
-import { storeApiKey, retrieveApiKey, clearApiKey } from "@/lib/secure-storage"
+import { storeApiKey, retrieveApiKey, clearApiKey, storeGeminiKey, retrieveGeminiKey, clearGeminiKey } from "@/lib/secure-storage"
 
 type Utterance = {
   speaker: string
@@ -62,15 +62,18 @@ export default function Home() {
   const [apiKey, setApiKey] = useState("")
   const [storedApiKey, setStoredApiKey] = useState("")
   const [isApiKeyStored, setIsApiKeyStored] = useState(false)
+  const [geminiKey, setGeminiKey] = useState("")
+  const [storedGeminiKey, setStoredGeminiKey] = useState("")
+  const [isGeminiKeyStored, setIsGeminiKeyStored] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<TranscriptionResult | null>(null)
   const [error, setError] = useState("")
+  const [errorType, setErrorType] = useState<"general" | "quota" | "auth" | null>(null)
+  const [errorSource, setErrorSource] = useState<"assemblyai" | "gemini" | null>(null)
   const [copied, setCopied] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [summaryMode, setSummaryMode] = useState<"paragraph" | "bullets">("paragraph")
-  const [includeSpeakerLabels, setIncludeSpeakerLabels] = useState(true)
-  const [includeHighlights, setIncludeHighlights] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -78,6 +81,11 @@ export default function Home() {
     if (savedKey) {
       setStoredApiKey(savedKey)
       setIsApiKeyStored(true)
+    }
+    const savedGeminiKey = retrieveGeminiKey()
+    if (savedGeminiKey) {
+      setStoredGeminiKey(savedGeminiKey)
+      setIsGeminiKeyStored(true)
     }
   }, [])
 
@@ -115,8 +123,12 @@ export default function Home() {
         if (audioFile.type.startsWith("audio/")) {
           setFile(audioFile)
           setError("")
+          setErrorType(null)
+          setErrorSource(null)
         } else {
           setError("Please upload an audio file")
+          setErrorType("general")
+          setErrorSource(null)
         }
       }
     }
@@ -138,6 +150,8 @@ export default function Home() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
       setError("")
+      setErrorType(null)
+      setErrorSource(null)
     }
   }
 
@@ -157,9 +171,27 @@ export default function Home() {
     setApiKey("")
   }
 
+  const handleStoreGeminiKey = () => {
+    if (geminiKey.trim()) {
+      storeGeminiKey(geminiKey)
+      setStoredGeminiKey(geminiKey)
+      setIsGeminiKeyStored(true)
+      setGeminiKey("")
+    }
+  }
+
+  const handleRemoveGeminiKey = () => {
+    clearGeminiKey()
+    setStoredGeminiKey("")
+    setIsGeminiKeyStored(false)
+    setGeminiKey("")
+  }
+
   const handleRemoveFile = () => {
     setFile(null)
     setError("")
+    setErrorType(null)
+    setErrorSource(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -170,44 +202,93 @@ export default function Home() {
 
     setIsProcessing(true)
     setError("")
+    setErrorType(null)
+    setErrorSource(null)
+
+    // Helper function to detect error types
+    const detectErrorType = (status: number, errorText: string): "quota" | "auth" | "general" => {
+      const lowerError = errorText.toLowerCase()
+      if (status === 401 || lowerError.includes("unauthorized") || lowerError.includes("invalid api key")) {
+        return "auth"
+      }
+      if (status === 429 || status === 402 || 
+          lowerError.includes("quota") || 
+          lowerError.includes("limit") || 
+          lowerError.includes("exceeded") ||
+          lowerError.includes("rate limit") ||
+          lowerError.includes("too many requests") ||
+          lowerError.includes("insufficient") ||
+          lowerError.includes("billing") ||
+          lowerError.includes("credits")) {
+        return "quota"
+      }
+      return "general"
+    }
 
     try {
       // Upload file to Assembly AI
-      const uploadResponse = await fetch("https://api.assemblyai.com/v2/upload", {
-        method: "POST",
-        headers: {
-          authorization: storedApiKey,
-        },
-        body: file,
-      })
+      let uploadResponse
+      try {
+        uploadResponse = await fetch("https://api.assemblyai.com/v2/upload", {
+          method: "POST",
+          headers: {
+            authorization: storedApiKey,
+          },
+          body: file,
+        })
+      } catch (uploadError) {
+        throw new Error("Network error uploading file. Please check your connection.")
+      }
 
       if (!uploadResponse.ok) {
-        throw new Error("Failed to upload file")
+        const errorText = await uploadResponse.text()
+        const errType = detectErrorType(uploadResponse.status, errorText)
+        setErrorType(errType)
+        setErrorSource("assemblyai")
+        if (errType === "quota") {
+          throw new Error("AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.")
+        } else if (errType === "auth") {
+          throw new Error("Invalid AssemblyAI API key. Please check your key and try again.")
+        }
+        throw new Error(`Failed to upload file: ${uploadResponse.status} - ${errorText}`)
       }
 
       const { upload_url } = await uploadResponse.json()
 
       const requestBody: any = {
         audio_url: upload_url,
-        auto_chapters: true,
-        auto_highlights: includeHighlights,
-        speaker_labels: includeSpeakerLabels,
-        entity_detection: includeHighlights,
+        // Core transcription features
+        speaker_labels: true,
         sentiment_analysis: true,
+        entity_detection: true,
       }
 
       // Start transcription with auto chapters for summary and key phrases, and speaker diarization enabled
-      const transcriptResponse = await fetch("https://api.assemblyai.com/v2/transcript", {
-        method: "POST",
-        headers: {
-          authorization: storedApiKey,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      })
+      let transcriptResponse
+      try {
+        transcriptResponse = await fetch("https://api.assemblyai.com/v2/transcript", {
+          method: "POST",
+          headers: {
+            authorization: storedApiKey,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        })
+      } catch (transcriptError) {
+        throw new Error("Network error starting transcription. Please check your connection.")
+      }
 
       if (!transcriptResponse.ok) {
-        throw new Error("Failed to start transcription")
+        const errorText = await transcriptResponse.text()
+        const errType = detectErrorType(transcriptResponse.status, errorText)
+        setErrorType(errType)
+        setErrorSource("assemblyai")
+        if (errType === "quota") {
+          throw new Error("AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.")
+        } else if (errType === "auth") {
+          throw new Error("Invalid AssemblyAI API key. Please check your key and try again.")
+        }
+        throw new Error(`Failed to start transcription: ${transcriptResponse.status} - ${errorText}`)
       }
 
       const { id } = await transcriptResponse.json()
@@ -217,11 +298,16 @@ export default function Home() {
       while (!transcript || transcript.status !== "completed") {
         await new Promise((resolve) => setTimeout(resolve, 3000))
 
-        const pollResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
-          headers: {
-            authorization: storedApiKey,
-          },
-        })
+        let pollResponse
+        try {
+          pollResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
+            headers: {
+              authorization: storedApiKey,
+            },
+          })
+        } catch (pollError) {
+          throw new Error("Network error while checking transcription status. Please try again.")
+        }
 
         transcript = await pollResponse.json()
 
@@ -230,21 +316,154 @@ export default function Home() {
         }
       }
 
-      const summaryParagraph = transcript.chapters?.[0]?.summary || transcript.text.substring(0, 200) + "..."
+      // Initialize result variables
+      let summaryParagraph = ""
+      let summaryBullets: string[] = []
+      let takeaways: string[] = []
+      let quotes: string[] = []
+      let geminiPositiveQuotes: SentimentQuote[] = []
+      let geminiNegativeQuotes: SentimentQuote[] = []
 
-      // Generate bullet points from chapters or create from text
-      const summaryBullets = transcript.chapters
-        ?.slice(0, 5)
-        .map((ch: any) => ch.summary)
-        .filter(Boolean) || [transcript.text.substring(0, 100) + "..."]
+      // Use Gemini API for high-quality AI-generated insights (if key is available)
+      if (storedGeminiKey) {
+        try {
+          const geminiResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${storedGeminiKey}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
 
-      const takeaways = transcript.chapters?.slice(0, 5).map((ch: any) => ch.headline) || [
-        "Key point extracted from transcription",
-      ]
+TRANSCRIPT TO ANALYZE:
+${transcript.text}
 
-      const quotes = transcript.auto_highlights_result?.results?.slice(0, 3).map((h: any) => h.text) || [
-        transcript.text.split(".")[0] + ".",
-      ]
+Analyze this transcript thoroughly and return ONLY a JSON object (no markdown, no code blocks, no explanations) with this exact structure:
+
+{
+  "summary": "Your summary here",
+  "bullets": ["bullet 1", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
+  "keyInsights": ["insight 1", "insight 2", "insight 3", "insight 4", "insight 5"],
+  "positiveQuotes": ["quote 1", "quote 2", "quote 3"],
+  "negativeQuotes": ["quote 1", "quote 2", "quote 3"],
+  "keyQuotes": ["quote 1", "quote 2", "quote 3"]
+}
+
+STRICT REQUIREMENTS FOR EACH FIELD:
+
+1. SUMMARY (4-6 sentences, 80-150 words):
+   Write a comprehensive paragraph that a product manager could read to understand the entire conversation. Include:
+   - Who participated and the context of the discussion
+   - The main topics and themes covered
+   - Key problems, needs, or pain points mentioned
+   - Any decisions, conclusions, or next steps discussed
+   - The overall tone and sentiment of the conversation
+
+2. BULLETS (5 items, each 15-25 words):
+   Five distinct bullet points that each summarize a different key topic or theme from the conversation. Each bullet should be a complete thought that stands alone.
+
+3. KEY INSIGHTS (5 items, each 20-40 words):
+   Five actionable insights that a product team could act on. Each MUST be a complete sentence that:
+   - Identifies a specific user need, problem, or opportunity
+   - Explains WHY it matters or what it implies
+   - Example format: "Users expressed significant frustration with [specific issue], suggesting that [implication or recommendation]."
+   DO NOT write single words or short phrases. Each insight must be a full, actionable sentence.
+
+4. POSITIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express satisfaction, praise, excitement, or positive feedback. Copy the exact words spoken. If fewer than 3 positive quotes exist, include what you can find.
+
+5. NEGATIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express frustration, criticism, concerns, or negative feedback. Copy the exact words spoken. If fewer than 3 negative quotes exist, include what you can find.
+
+6. KEY QUOTES (3 items):
+   Three EXACT verbatim quotes that are the most memorable, insightful, or impactful statements from the transcript. These should capture the essence of the conversation.
+
+Return ONLY the JSON object. No other text.`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 4096,
+                },
+              }),
+            }
+          )
+
+          if (geminiResponse.ok) {
+            const geminiResult = await geminiResponse.json()
+            const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text || ""
+            
+            try {
+              // Clean the response - remove markdown code blocks if present
+              const cleanedResponse = responseText
+                .replace(/```json\n?/g, "")
+                .replace(/```\n?/g, "")
+                .trim()
+              
+              const insights = JSON.parse(cleanedResponse)
+              
+              summaryParagraph = insights.summary || ""
+              summaryBullets = insights.bullets || []
+              takeaways = insights.keyInsights || []
+              quotes = insights.keyQuotes || []
+              
+              // Convert positive quotes to SentimentQuote format
+              if (insights.positiveQuotes) {
+                geminiPositiveQuotes = insights.positiveQuotes.map((q: string) => ({
+                  text: q,
+                  sentiment: "POSITIVE",
+                  confidence: 0.9,
+                }))
+              }
+              
+              // Convert negative quotes to SentimentQuote format
+              if (insights.negativeQuotes) {
+                geminiNegativeQuotes = insights.negativeQuotes.map((q: string) => ({
+                  text: q,
+                  sentiment: "NEGATIVE",
+                  confidence: 0.9,
+                }))
+              }
+            } catch (parseError) {
+              console.error("Failed to parse Gemini response:", parseError, responseText)
+              throw new Error("Failed to analyze transcript. Gemini returned an invalid response. Please try again.")
+            }
+          } else {
+            // Check for quota errors from Gemini
+            const errorText = await geminiResponse.text()
+            const errType = detectErrorType(geminiResponse.status, errorText)
+            setErrorType(errType)
+            setErrorSource("gemini")
+            if (errType === "quota") {
+              throw new Error("Gemini API free tier limit reached. Please check your Gemini quota or upgrade your plan.")
+            } else if (errType === "auth") {
+              throw new Error("Invalid Gemini API key. Please check your key and try again.")
+            } else {
+              throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`)
+            }
+          }
+        } catch (geminiError) {
+          // Re-throw if it's already a handled error
+          if (geminiError instanceof Error && geminiError.message.includes("Gemini")) {
+            throw geminiError
+          }
+          console.error("Gemini API error:", geminiError)
+          throw new Error("Failed to connect to Gemini API. Please check your internet connection and try again.")
+        }
+      }
+
+      // Verify Gemini provided all required data
+      if (!summaryParagraph || summaryBullets.length === 0 || takeaways.length === 0) {
+        throw new Error("Gemini did not return complete analysis. Please try again.")
+      }
 
       const utterances: Utterance[] = transcript.utterances || []
 
@@ -310,7 +529,7 @@ export default function Home() {
         }
 
         // Calculate speaker-level sentiments if speaker labels are available
-        if (includeSpeakerLabels && transcript.utterances) {
+        if (transcript.utterances) {
           const speakerSentimentMap: Record<string, string[]> = {}
 
           transcript.utterances.forEach((utterance: any) => {
@@ -359,36 +578,39 @@ export default function Home() {
         }
       }
 
-      const positiveQuotes: SentimentQuote[] = []
-      const negativeQuotes: SentimentQuote[] = []
+      // Use Gemini-generated quotes if available, otherwise fall back to sentiment analysis
+      let positiveQuotes: SentimentQuote[] = geminiPositiveQuotes
+      let negativeQuotes: SentimentQuote[] = geminiNegativeQuotes
 
-      if (transcript.sentiment_analysis_results) {
-        // Sort by confidence and filter by sentiment
-        const sortedResults = [...transcript.sentiment_analysis_results].sort(
-          (a: any, b: any) => b.confidence - a.confidence,
-        )
+      // Fallback to sentiment analysis if Gemini didn't provide quotes
+      if (positiveQuotes.length === 0 || negativeQuotes.length === 0) {
+        if (transcript.sentiment_analysis_results) {
+          const sortedResults = [...transcript.sentiment_analysis_results].sort(
+            (a: any, b: any) => b.confidence - a.confidence,
+          )
 
-        sortedResults.forEach((result: any) => {
-          const sentiment = result.sentiment.toUpperCase()
-          const text = result.text
+          sortedResults.forEach((result: any) => {
+            const sentiment = result.sentiment.toUpperCase()
+            const text = result.text
 
-          // Only include substantial quotes (more than 10 words)
-          if (text.split(" ").length > 10) {
-            if (sentiment === "POSITIVE" && positiveQuotes.length < 3) {
-              positiveQuotes.push({
-                text,
-                sentiment,
-                confidence: result.confidence,
-              })
-            } else if (sentiment === "NEGATIVE" && negativeQuotes.length < 3) {
-              negativeQuotes.push({
-                text,
-                sentiment,
-                confidence: result.confidence,
-              })
+            // Only include substantial quotes (more than 10 words)
+            if (text.split(" ").length > 10) {
+              if (sentiment === "POSITIVE" && positiveQuotes.length < 3) {
+                positiveQuotes.push({
+                  text,
+                  sentiment,
+                  confidence: result.confidence,
+                })
+              } else if (sentiment === "NEGATIVE" && negativeQuotes.length < 3) {
+                negativeQuotes.push({
+                  text,
+                  sentiment,
+                  confidence: result.confidence,
+                })
+              }
             }
-          }
-        })
+          })
+        }
       }
 
       setResult({
@@ -406,38 +628,122 @@ export default function Home() {
         negativeQuotes,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      setError(errorMessage)
+      // Set error type if not already set
+      if (!errorType) {
+        const lowerError = errorMessage.toLowerCase()
+        if (lowerError.includes("quota") || lowerError.includes("limit") || lowerError.includes("exceeded")) {
+          setErrorType("quota")
+        } else if (lowerError.includes("unauthorized") || lowerError.includes("invalid") && lowerError.includes("key")) {
+          setErrorType("auth")
+        } else {
+          setErrorType("general")
+        }
+      }
     } finally {
       setIsProcessing(false)
     }
   }
 
-  const handleExportToGoogleDocs = () => {
+  const handleDownloadInsights = () => {
     if (!result) return
 
-    const summaryContent =
-      summaryMode === "paragraph"
-        ? result.summaryParagraph
-        : result.summaryBullets.map((b, i) => `${i + 1}. ${b}`).join("\n")
+    // Build comprehensive content with all sections
+    let content = `SUPERSONIQ INSIGHTS
+${"=".repeat(50)}
 
-    const content = `Supersoniq Insights
+SUMMARY
+${"-".repeat(30)}
+${result.summaryParagraph}
 
-Summary:
-${summaryContent}
+BULLET POINTS
+${"-".repeat(30)}
+${result.summaryBullets.map((b) => `• ${b}`).join("\n")}
 
-Top Takeaways:
+KEY INSIGHTS
+${"-".repeat(30)}
 ${result.takeaways.map((t, i) => `${i + 1}. ${t}`).join("\n")}
-
-Key Quotes:
-${result.quotes.map((q) => `"${q}"`).join("\n\n")}
-
-Full Transcript:
-${result.fullTranscript}
 `
 
-    const encodedContent = encodeURIComponent(content)
-    const googleDocsUrl = `https://docs.google.com/document/create?title=Supersoniq%20Insights&body=${encodedContent}`
-    window.open(googleDocsUrl, "_blank")
+    // Add Themes if available
+    if (result.themes && result.themes.length > 0) {
+      content += `
+THEMES & TOPICS
+${"-".repeat(30)}
+${result.themes.slice(0, 10).map((theme) => `• ${theme.text}${theme.count && theme.count > 1 ? ` (mentioned ${theme.count}x)` : ""}`).join("\n")}
+`
+    }
+
+    // Add Sentiment Analysis if available
+    if (result.overallSentiment) {
+      content += `
+SENTIMENT ANALYSIS
+${"-".repeat(30)}
+Overall Sentiment: ${result.overallSentiment}
+`
+      if (result.speakerSentiments && result.speakerSentiments.length > 0) {
+        content += `\nSpeaker Sentiments:\n`
+        content += result.speakerSentiments.map((s) => `• ${s.speaker}: ${s.description}`).join("\n")
+      }
+    }
+
+    // Add Positive Quotes if available
+    if (result.positiveQuotes && result.positiveQuotes.length > 0) {
+      content += `
+
+POSITIVE QUOTES
+${"-".repeat(30)}
+${result.positiveQuotes.map((q) => `"${q.text}"`).join("\n\n")}
+`
+    }
+
+    // Add Negative Quotes if available
+    if (result.negativeQuotes && result.negativeQuotes.length > 0) {
+      content += `
+
+NEGATIVE QUOTES
+${"-".repeat(30)}
+${result.negativeQuotes.map((q) => `"${q.text}"`).join("\n\n")}
+`
+    }
+
+    // Add Key Quotes
+    content += `
+
+KEY QUOTES
+${"-".repeat(30)}
+${result.quotes.map((q) => `"${q}"`).join("\n\n")}
+`
+
+    // Add Full Transcript with speaker labels if available
+    content += `
+
+FULL TRANSCRIPT
+${"-".repeat(30)}
+`
+    if (result.utterances && result.utterances.length > 0) {
+      content += result.utterances.map((u) => `[${u.speaker}]: ${u.text}`).join("\n\n")
+    } else {
+      content += result.fullTranscript
+    }
+
+    content += `
+
+${"=".repeat(50)}
+Generated by Supersoniq Insights
+`
+
+    // Create and download the file
+    const blob = new Blob([content], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `supersoniq-insights-${new Date().toISOString().split("T")[0]}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const handleCopyTranscript = async () => {
@@ -456,6 +762,8 @@ ${result.fullTranscript}
     setResult(null)
     setFile(null)
     setError("")
+    setErrorType(null)
+    setErrorSource(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -530,6 +838,51 @@ ${result.fullTranscript}
             )}
           </div>
 
+          {/* Gemini API Key Input */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="geminiKey" className="text-[#1B1823] text-sm font-medium">
+                Gemini API Key
+              </Label>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#01A0A9] hover:underline font-medium text-xs"
+              >
+                Get Free
+              </a>
+            </div>
+
+            {!isGeminiKeyStored ? (
+              <div className="flex gap-2">
+                <Input
+                  id="geminiKey"
+                  type="password"
+                  placeholder="Enter your Gemini key"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  className="flex-1 h-11 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823]"
+                />
+                <Button
+                  onClick={handleStoreGeminiKey}
+                  disabled={!geminiKey.trim()}
+                  className="h-11 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Go
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between h-11 px-4 border border-[#E5E7EB] rounded-[8px] bg-[#FFFFFF]">
+                <span className="text-[#1B1823] text-sm">...{storedGeminiKey.slice(-4)}</span>
+                <button onClick={handleRemoveGeminiKey} className="text-[#01A0A9] hover:underline font-medium text-xs">
+                  Remove
+                </button>
+              </div>
+            )}
+            <p className="text-[10px] text-[#39939E]">Powers AI summaries, insights & quotes</p>
+          </div>
+
           {/* File Upload */}
           <div className="space-y-3">
             <Label htmlFor="audio" className="text-[#1B1823] text-sm font-medium">
@@ -576,56 +929,10 @@ ${result.fullTranscript}
             </div>
           </div>
 
-          <div className="space-y-4 pt-6 border-t border-[#E5E7EB]">
-            {/* Include speaker labels toggle */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="speakerLabels" className="text-[#1B1823] cursor-pointer text-xs">
-                Include speaker labels
-              </Label>
-              <button
-                id="speakerLabels"
-                role="switch"
-                aria-checked={includeSpeakerLabels}
-                onClick={() => setIncludeSpeakerLabels(!includeSpeakerLabels)}
-                className={`relative inline-flex items-center rounded-full transition-colors w-9 h-3.5 ${
-                  includeSpeakerLabels ? "bg-[#01A0A9]" : "bg-[#E5E7EB]"
-                }`}
-              >
-                <span
-                  className={`inline-block transform rounded-full bg-white transition-transform w-2.5 h-2.5 ${
-                    includeSpeakerLabels ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Include highlights toggle */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="highlights" className="text-[#1B1823] cursor-pointer text-xs">
-                Include highlights
-              </Label>
-              <button
-                id="highlights"
-                role="switch"
-                aria-checked={includeHighlights}
-                onClick={() => setIncludeHighlights(!includeHighlights)}
-                className={`relative inline-flex items-center rounded-full transition-colors h-3.5 w-9 ${
-                  includeHighlights ? "bg-[#01A0A9]" : "bg-[#E5E7EB]"
-                }`}
-              >
-                <span
-                  className={`inline-block transform rounded-full bg-white transition-transform w-2.5 h-2.5 ${
-                    includeHighlights ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
           {/* Transcribe Button */}
           <Button
             onClick={handleTranscribe}
-            disabled={!file || !storedApiKey || isProcessing}
+            disabled={!file || !storedApiKey || !storedGeminiKey || isProcessing}
             className="w-full h-12 bg-[#01A0A9] hover:bg-[#39939E] text-white font-medium rounded-[10px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isProcessing ? (
@@ -644,8 +951,106 @@ ${result.fullTranscript}
           {/* Error Message */}
           {error && !result && !isProcessing && (
             <div className="h-full flex items-center justify-center p-8">
-              <div className="p-6 bg-[#FEF2F2] border border-[#E73F36] rounded-[8px] max-w-md">
-                <p className="text-[#E73F36] text-sm leading-relaxed">{error}</p>
+              <div className={`p-8 rounded-[12px] max-w-lg text-center ${
+                errorType === "quota" 
+                  ? "bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] border-2 border-[#F59E0B]" 
+                  : errorType === "auth"
+                  ? "bg-gradient-to-br from-[#FEE2E2] to-[#FECACA] border-2 border-[#EF4444]"
+                  : "bg-[#FEF2F2] border border-[#E73F36]"
+              }`}>
+                {/* Icon */}
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                  errorType === "quota" 
+                    ? "bg-[#F59E0B]/20" 
+                    : errorType === "auth"
+                    ? "bg-[#EF4444]/20"
+                    : "bg-[#E73F36]/10"
+                }`}>
+                  {errorType === "quota" ? (
+                    <svg className="w-8 h-8 text-[#D97706]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : errorType === "auth" ? (
+                    <svg className="w-8 h-8 text-[#EF4444]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-8 h-8 text-[#E73F36]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                </div>
+
+                {/* Title */}
+                <h3 className={`text-xl font-semibold mb-2 ${
+                  errorType === "quota" 
+                    ? "text-[#92400E]" 
+                    : errorType === "auth"
+                    ? "text-[#991B1B]"
+                    : "text-[#E73F36]"
+                }`}>
+                  {errorType === "quota" 
+                    ? "Free Tier Limit Reached" 
+                    : errorType === "auth"
+                    ? "Invalid API Key"
+                    : "Something Went Wrong"}
+                </h3>
+
+                {/* Message */}
+                <p className={`text-sm leading-relaxed mb-4 ${
+                  errorType === "quota" 
+                    ? "text-[#A16207]" 
+                    : errorType === "auth"
+                    ? "text-[#B91C1C]"
+                    : "text-[#E73F36]"
+                }`}>
+                  {error}
+                </p>
+
+                {/* Action buttons */}
+                <div className="flex flex-col gap-2">
+                  {errorType === "quota" && (
+                    <>
+                      <a
+                        href={errorSource === "gemini" 
+                          ? "https://aistudio.google.com/app/apikey" 
+                          : "https://www.assemblyai.com/dashboard"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-white rounded-[8px] font-medium text-sm transition-colors"
+                      >
+                        {errorSource === "gemini" ? "Manage Gemini API" : "Upgrade AssemblyAI Plan"}
+                      </a>
+                      <p className="text-xs text-[#A16207] mt-2">
+                        Or wait for your quota to reset
+                      </p>
+                    </>
+                  )}
+                  {errorType === "auth" && (
+                    <button
+                      onClick={() => {
+                        setError("")
+                        setErrorType(null)
+                        setErrorSource(null)
+                      }}
+                      className="inline-flex items-center justify-center px-4 py-2 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-[8px] font-medium text-sm transition-colors"
+                    >
+                      Check {errorSource === "gemini" ? "Gemini" : "AssemblyAI"} Key
+                    </button>
+                  )}
+                  {errorType === "general" && (
+                    <button
+                      onClick={() => {
+                        setError("")
+                        setErrorType(null)
+                        setErrorSource(null)
+                      }}
+                      className="inline-flex items-center justify-center px-4 py-2 bg-[#E73F36] hover:bg-[#C53030] text-white rounded-[8px] font-medium text-sm transition-colors"
+                    >
+                      Try Again
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -680,11 +1085,11 @@ ${result.fullTranscript}
             <div className="space-y-6 animate-in fade-in duration-500 mx-8 my-8">
               <div className="flex justify-end">
                 <Button
-                  onClick={handleExportToGoogleDocs}
-                  className="bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium transition-all hover:shadow-[0_4px_12px_rgba(1,160,169,0.3)] text-center h-[30px] w-48"
+                  onClick={handleDownloadInsights}
+                  className="bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium transition-all hover:shadow-[0_4px_12px_rgba(1,160,169,0.3)] text-center h-[30px] px-4"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Export to Google Docs
+                  Download Insights
                 </Button>
               </div>
 
@@ -741,7 +1146,7 @@ ${result.fullTranscript}
                 </ul>
               </Card>
 
-              {includeHighlights && result.themes && result.themes.length > 0 && (
+              {result.themes && result.themes.length > 0 && (
                 <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
                   <h2 className="text-2xl font-medium text-[#1B1823] mb-4">Themes</h2>
                   <div className="space-y-4">
@@ -979,7 +1384,7 @@ ${result.fullTranscript}
                 </div>
 
                 <div className="max-h-[500px] overflow-y-auto space-y-3 pr-2">
-                  {result.utterances && includeSpeakerLabels ? (
+                  {result.utterances && result.utterances.length > 0 ? (
                     result.utterances.map((utterance, index) => (
                       <div
                         key={index}
