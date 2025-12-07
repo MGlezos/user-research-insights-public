@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Supersoniq design system color tokens */
+:root {
+  /* Primary Colors */
+  --color-primary: #01a0a9;
+  --color-primary-hover: #019fa8;
+  --color-secondary: #7ae241;
+  --color-secondary-hover: #6bcf2a;
+
+  /* Text Colors */
+  --color-text-primary: #1b1823;
+  --color-text-secondary: #39939e;
+  --color-text-muted: #667576;
+
+  /* Background Colors */
+  --color-background: #ffffff;
+  --color-background-card: #f7f9f8;
+  --color-background-muted: #f9fafb;
+
+  /* Border Colors */
+  --color-border: #e5e7eb;
+  --color-border-focus: #01a0a9;
+  --color-border-error: #e73f36;
+
+  /* Status Colors */
+  --color-success: #3fbb50;
+  --color-warning: #e5a900;
+  --color-error: #e73f36;
+  --color-info: #63c6db;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+
+  /* Animation Durations */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+}
+
+@theme inline {
+  /* Supersoniq font families */
+  --font-sans: var(--font-cabin), "Cabin", system-ui, sans-serif;
+  --font-heading: var(--font-oswald), "Oswald", sans-serif;
+
+  /* Color mappings */
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-text-primary);
+  --color-card: var(--color-background-card);
+  --color-card-foreground: var(--color-text-primary);
+  --color-popover: var(--color-background);
+  --color-popover-foreground: var(--color-text-primary);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-background-muted);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-muted: var(--color-background-muted);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent: var(--color-background-muted);
+  --color-accent-foreground: var(--color-text-primary);
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-border);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-primary);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --color-sidebar: var(--color-background);
+  --color-sidebar-foreground: var(--color-text-primary);
+  --color-sidebar-primary: var(--color-primary);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: var(--color-background-muted);
+  --color-sidebar-accent-foreground: var(--color-text-primary);
+  --color-sidebar-border: var(--color-border);
+  --color-sidebar-ring: var(--color-primary);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-white text-[#1b1823];
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
