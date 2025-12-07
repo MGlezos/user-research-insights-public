@@ -8,7 +8,14 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Upload, FileAudio, Download, X, Check } from "lucide-react"
-import { storeApiKey, retrieveApiKey, clearApiKey, storeGeminiKey, retrieveGeminiKey, clearGeminiKey } from "@/lib/secure-storage"
+import {
+  storeApiKey,
+  retrieveApiKey,
+  clearApiKey,
+  storeGeminiKey,
+  retrieveGeminiKey,
+  clearGeminiKey,
+} from "@/lib/secure-storage"
 
 type Utterance = {
   speaker: string
@@ -211,15 +218,18 @@ export default function Home() {
       if (status === 401 || lowerError.includes("unauthorized") || lowerError.includes("invalid api key")) {
         return "auth"
       }
-      if (status === 429 || status === 402 || 
-          lowerError.includes("quota") || 
-          lowerError.includes("limit") || 
-          lowerError.includes("exceeded") ||
-          lowerError.includes("rate limit") ||
-          lowerError.includes("too many requests") ||
-          lowerError.includes("insufficient") ||
-          lowerError.includes("billing") ||
-          lowerError.includes("credits")) {
+      if (
+        status === 429 ||
+        status === 402 ||
+        lowerError.includes("quota") ||
+        lowerError.includes("limit") ||
+        lowerError.includes("exceeded") ||
+        lowerError.includes("rate limit") ||
+        lowerError.includes("too many requests") ||
+        lowerError.includes("insufficient") ||
+        lowerError.includes("billing") ||
+        lowerError.includes("credits")
+      ) {
         return "quota"
       }
       return "general"
@@ -246,7 +256,9 @@ export default function Home() {
         setErrorType(errType)
         setErrorSource("assemblyai")
         if (errType === "quota") {
-          throw new Error("AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.")
+          throw new Error(
+            "AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.",
+          )
         } else if (errType === "auth") {
           throw new Error("Invalid AssemblyAI API key. Please check your key and try again.")
         }
@@ -284,7 +296,9 @@ export default function Home() {
         setErrorType(errType)
         setErrorSource("assemblyai")
         if (errType === "quota") {
-          throw new Error("AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.")
+          throw new Error(
+            "AssemblyAI free tier limit reached. Please upgrade your plan or wait for your quota to reset.",
+          )
         } else if (errType === "auth") {
           throw new Error("Invalid AssemblyAI API key. Please check your key and try again.")
         }
@@ -394,27 +408,27 @@ Return ONLY the JSON object. No other text.`,
                   maxOutputTokens: 4096,
                 },
               }),
-            }
+            },
           )
 
           if (geminiResponse.ok) {
             const geminiResult = await geminiResponse.json()
             const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text || ""
-            
+
             try {
               // Clean the response - remove markdown code blocks if present
               const cleanedResponse = responseText
                 .replace(/```json\n?/g, "")
                 .replace(/```\n?/g, "")
                 .trim()
-              
+
               const insights = JSON.parse(cleanedResponse)
-              
+
               summaryParagraph = insights.summary || ""
               summaryBullets = insights.bullets || []
               takeaways = insights.keyInsights || []
               quotes = insights.keyQuotes || []
-              
+
               // Convert positive quotes to SentimentQuote format
               if (insights.positiveQuotes) {
                 geminiPositiveQuotes = insights.positiveQuotes.map((q: string) => ({
@@ -423,7 +437,7 @@ Return ONLY the JSON object. No other text.`,
                   confidence: 0.9,
                 }))
               }
-              
+
               // Convert negative quotes to SentimentQuote format
               if (insights.negativeQuotes) {
                 geminiNegativeQuotes = insights.negativeQuotes.map((q: string) => ({
@@ -443,7 +457,9 @@ Return ONLY the JSON object. No other text.`,
             setErrorType(errType)
             setErrorSource("gemini")
             if (errType === "quota") {
-              throw new Error("Gemini API free tier limit reached. Please check your Gemini quota or upgrade your plan.")
+              throw new Error(
+                "Gemini API free tier limit reached. Please check your Gemini quota or upgrade your plan.",
+              )
             } else if (errType === "auth") {
               throw new Error("Invalid Gemini API key. Please check your key and try again.")
             } else {
@@ -579,8 +595,8 @@ Return ONLY the JSON object. No other text.`,
       }
 
       // Use Gemini-generated quotes if available, otherwise fall back to sentiment analysis
-      let positiveQuotes: SentimentQuote[] = geminiPositiveQuotes
-      let negativeQuotes: SentimentQuote[] = geminiNegativeQuotes
+      const positiveQuotes: SentimentQuote[] = geminiPositiveQuotes
+      const negativeQuotes: SentimentQuote[] = geminiNegativeQuotes
 
       // Fallback to sentiment analysis if Gemini didn't provide quotes
       if (positiveQuotes.length === 0 || negativeQuotes.length === 0) {
@@ -635,7 +651,10 @@ Return ONLY the JSON object. No other text.`,
         const lowerError = errorMessage.toLowerCase()
         if (lowerError.includes("quota") || lowerError.includes("limit") || lowerError.includes("exceeded")) {
           setErrorType("quota")
-        } else if (lowerError.includes("unauthorized") || lowerError.includes("invalid") && lowerError.includes("key")) {
+        } else if (
+          lowerError.includes("unauthorized") ||
+          (lowerError.includes("invalid") && lowerError.includes("key"))
+        ) {
           setErrorType("auth")
         } else {
           setErrorType("general")
@@ -671,7 +690,10 @@ ${result.takeaways.map((t, i) => `${i + 1}. ${t}`).join("\n")}
       content += `
 THEMES & TOPICS
 ${"-".repeat(30)}
-${result.themes.slice(0, 10).map((theme) => `• ${theme.text}${theme.count && theme.count > 1 ? ` (mentioned ${theme.count}x)` : ""}`).join("\n")}
+${result.themes
+  .slice(0, 10)
+  .map((theme) => `• ${theme.text}${theme.count && theme.count > 1 ? ` (mentioned ${theme.count}x)` : ""}`)
+  .join("\n")}
 `
     }
 
@@ -780,7 +802,6 @@ Generated by Supersoniq Insights
         </div>
       )}
 
-      {/* Header */}
       <div className="border-b border-[#E5E7EB] bg-[#F7F9F8]">
         <div className="px-8 py-6 flex items-center justify-between">
           <img src="/images/supersoniq-20insights-20logo.png" alt="Supersoniq Insights" className="h-[50px] w-auto" />
@@ -790,14 +811,13 @@ Generated by Supersoniq Insights
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex">
-        {/* Left Panel - Controls */}
-        <div className="w-[30%] border-r border-[#E5E7EB] p-8 space-y-6 bg-[#F7F9F8]">
+      <div className="flex-1 flex flex-col">
+        {/* Top Row - Controls (100px tall) */}
+        <div className="h-[100px] border-b border-[#E5E7EB] bg-[#F7F9F8] px-8 flex items-center gap-6">
           {/* API Key Input or Display */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="apiKey" className="text-[#1B1823] text-sm font-medium">
+          <div className="flex-1 flex items-center gap-4">
+            <div className="flex items-center gap-2 min-w-[140px]">
+              <Label htmlFor="apiKey" className="text-[#1B1823] text-sm font-medium whitespace-nowrap">
                 AssemblyAI API Key
               </Label>
               <a
@@ -811,37 +831,40 @@ Generated by Supersoniq Insights
             </div>
 
             {!isApiKeyStored ? (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-1 max-w-[300px]">
                 <Input
                   id="apiKey"
                   type="password"
                   placeholder="Enter your key"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="flex-1 h-11 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823]"
+                  className="flex-1 h-9 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] text-sm"
                 />
                 <Button
                   onClick={handleStoreApiKey}
                   disabled={!apiKey.trim()}
-                  className="h-11 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 px-4 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   Go
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-between h-11 px-4 border border-[#E5E7EB] rounded-[8px] bg-[#FFFFFF]">
+              <div className="flex items-center justify-between h-9 px-4 border border-[#E5E7EB] rounded-[8px] bg-[#FFFFFF] max-w-[200px]">
                 <span className="text-[#1B1823] text-sm">...{storedApiKey.slice(-4)}</span>
-                <button onClick={handleRemoveApiKey} className="text-[#01A0A9] hover:underline font-medium text-xs">
+                <button
+                  onClick={handleRemoveApiKey}
+                  className="text-[#01A0A9] hover:underline font-medium text-xs ml-4"
+                >
                   Remove
                 </button>
               </div>
             )}
           </div>
 
-          {/* Gemini API Key Input */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="geminiKey" className="text-[#1B1823] text-sm font-medium">
+          {/* Gemini API Key */}
+          <div className="flex-1 flex items-center gap-4">
+            <div className="flex items-center gap-2 min-w-[120px]">
+              <Label htmlFor="geminiKey" className="text-[#1B1823] text-sm font-medium whitespace-nowrap">
                 Gemini API Key
               </Label>
               <a
@@ -855,37 +878,39 @@ Generated by Supersoniq Insights
             </div>
 
             {!isGeminiKeyStored ? (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-1 max-w-[300px]">
                 <Input
                   id="geminiKey"
                   type="password"
                   placeholder="Enter your Gemini key"
                   value={geminiKey}
                   onChange={(e) => setGeminiKey(e.target.value)}
-                  className="flex-1 h-11 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823]"
+                  className="flex-1 h-9 px-4 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] text-sm"
                 />
                 <Button
                   onClick={handleStoreGeminiKey}
                   disabled={!geminiKey.trim()}
-                  className="h-11 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-9 px-4 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   Go
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-between h-11 px-4 border border-[#E5E7EB] rounded-[8px] bg-[#FFFFFF]">
+              <div className="flex items-center justify-between h-9 px-4 border border-[#E5E7EB] rounded-[8px] bg-[#FFFFFF] max-w-[200px]">
                 <span className="text-[#1B1823] text-sm">...{storedGeminiKey.slice(-4)}</span>
-                <button onClick={handleRemoveGeminiKey} className="text-[#01A0A9] hover:underline font-medium text-xs">
+                <button
+                  onClick={handleRemoveGeminiKey}
+                  className="text-[#01A0A9] hover:underline font-medium text-xs ml-4"
+                >
                   Remove
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-[#39939E]">Powers AI summaries, insights & quotes</p>
           </div>
 
           {/* File Upload */}
-          <div className="space-y-3">
-            <Label htmlFor="audio" className="text-[#1B1823] text-sm font-medium">
+          <div className="flex items-center gap-4">
+            <Label htmlFor="audio" className="text-[#1B1823] text-sm font-medium whitespace-nowrap">
               Audio File
             </Label>
             <div className="relative">
@@ -901,29 +926,27 @@ Generated by Supersoniq Insights
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-24 border-2 border-dashed border-[#E5E7EB] rounded-[8px] hover:border-[#01A0A9] hover:bg-[#FFFFFF] transition-colors text-[#39939E]"
+                className="h-9 px-4 border-2 border-dashed border-[#E5E7EB] rounded-[8px] hover:border-[#01A0A9] hover:bg-[#FFFFFF] transition-colors text-[#39939E] text-sm"
               >
-                <div className="flex flex-col items-center gap-2">
-                  {file ? (
-                    <>
-                      <FileAudio className="w-8 h-8 text-[#01A0A9]" />
-                      <span className="text-xs text-[#1B1823] font-medium text-center px-2 break-all">{file.name}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8" />
-                      <span className="text-sm">Click to upload audio file</span>
-                    </>
-                  )}
-                </div>
+                {file ? (
+                  <div className="flex items-center gap-2">
+                    <FileAudio className="w-4 h-4 text-[#01A0A9]" />
+                    <span className="text-xs text-[#1B1823] font-medium max-w-[150px] truncate">{file.name}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm">Click to upload</span>
+                  </div>
+                )}
               </Button>
               {file && (
                 <button
                   onClick={handleRemoveFile}
-                  className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                  className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors border border-[#E5E7EB]"
                   aria-label="Remove file"
                 >
-                  <X className="w-4 h-4 text-[#1B1823]" />
+                  <X className="w-3 h-3 text-[#1B1823]" />
                 </button>
               )}
             </div>
@@ -933,7 +956,7 @@ Generated by Supersoniq Insights
           <Button
             onClick={handleTranscribe}
             disabled={!file || !storedApiKey || !storedGeminiKey || isProcessing}
-            className="w-full h-12 bg-[#01A0A9] hover:bg-[#39939E] text-white font-medium rounded-[10px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="h-9 px-6 bg-[#01A0A9] hover:bg-[#39939E] text-white font-medium rounded-[8px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
           >
             {isProcessing ? (
               <>
@@ -946,468 +969,551 @@ Generated by Supersoniq Insights
           </Button>
         </div>
 
-        {/* Right Panel - Results */}
+        {/* Bottom Row - Results */}
         <div className="flex-1 bg-white overflow-auto">
-          {/* Error Message */}
-          {error && !result && !isProcessing && (
-            <div className="h-full flex items-center justify-center p-8">
-              <div className={`p-8 rounded-[12px] max-w-lg text-center ${
-                errorType === "quota" 
-                  ? "bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] border-2 border-[#F59E0B]" 
-                  : errorType === "auth"
-                  ? "bg-gradient-to-br from-[#FEE2E2] to-[#FECACA] border-2 border-[#EF4444]"
-                  : "bg-[#FEF2F2] border border-[#E73F36]"
-              }`}>
-                {/* Icon */}
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                  errorType === "quota" 
-                    ? "bg-[#F59E0B]/20" 
-                    : errorType === "auth"
-                    ? "bg-[#EF4444]/20"
-                    : "bg-[#E73F36]/10"
-                }`}>
-                  {errorType === "quota" ? (
-                    <svg className="w-8 h-8 text-[#D97706]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  ) : errorType === "auth" ? (
-                    <svg className="w-8 h-8 text-[#EF4444]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-8 h-8 text-[#E73F36]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  )}
+          {!isApiKeyStored || !isGeminiKeyStored ? (
+            <div className="h-full flex items-center justify-center p-12">
+              <div className="max-w-2xl text-center space-y-8">
+                <div>
+                  <h2 className="text-3xl font-semibold text-[#1B1823] mb-4">
+                    Turn user research audio into actionable insights.
+                  </h2>
+                  <p className="text-lg text-[#39939E] leading-relaxed">
+                    Get started by adding your API keys above. Both are free to use and easy to set up.
+                  </p>
                 </div>
 
-                {/* Title */}
-                <h3 className={`text-xl font-semibold mb-2 ${
-                  errorType === "quota" 
-                    ? "text-[#92400E]" 
-                    : errorType === "auth"
-                    ? "text-[#991B1B]"
-                    : "text-[#E73F36]"
-                }`}>
-                  {errorType === "quota" 
-                    ? "Free Tier Limit Reached" 
-                    : errorType === "auth"
-                    ? "Invalid API Key"
-                    : "Something Went Wrong"}
-                </h3>
-
-                {/* Message */}
-                <p className={`text-sm leading-relaxed mb-4 ${
-                  errorType === "quota" 
-                    ? "text-[#A16207]" 
-                    : errorType === "auth"
-                    ? "text-[#B91C1C]"
-                    : "text-[#E73F36]"
-                }`}>
-                  {error}
-                </p>
-
-                {/* Action buttons */}
-                <div className="flex flex-col gap-2">
-                  {errorType === "quota" && (
-                    <>
-                      <a
-                        href={errorSource === "gemini" 
-                          ? "https://aistudio.google.com/app/apikey" 
-                          : "https://www.assemblyai.com/dashboard"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-white rounded-[8px] font-medium text-sm transition-colors"
-                      >
-                        {errorSource === "gemini" ? "Manage Gemini API" : "Upgrade AssemblyAI Plan"}
-                      </a>
-                      <p className="text-xs text-[#A16207] mt-2">
-                        Or wait for your quota to reset
-                      </p>
-                    </>
-                  )}
-                  {errorType === "auth" && (
-                    <button
-                      onClick={() => {
-                        setError("")
-                        setErrorType(null)
-                        setErrorSource(null)
-                      }}
-                      className="inline-flex items-center justify-center px-4 py-2 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-[8px] font-medium text-sm transition-colors"
+                <div className="grid md:grid-cols-2 gap-6 text-left">
+                  <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
+                    <h3 className="text-lg font-semibold text-[#1B1823] mb-3">AssemblyAI API Key</h3>
+                    <p className="text-sm text-[#39939E] mb-4">
+                      Powers transcription with speaker labels and sentiment analysis.
+                    </p>
+                    <a
+                      href="https://www.assemblyai.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
                     >
-                      Check {errorSource === "gemini" ? "Gemini" : "AssemblyAI"} Key
-                    </button>
-                  )}
-                  {errorType === "general" && (
-                    <button
-                      onClick={() => {
-                        setError("")
-                        setErrorType(null)
-                        setErrorSource(null)
-                      }}
-                      className="inline-flex items-center justify-center px-4 py-2 bg-[#E73F36] hover:bg-[#C53030] text-white rounded-[8px] font-medium text-sm transition-colors"
+                      Get your free key →
+                    </a>
+                  </Card>
+
+                  <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
+                    <h3 className="text-lg font-semibold text-[#1B1823] mb-3">Gemini API Key</h3>
+                    <p className="text-sm text-[#39939E] mb-4">
+                      Generates high-quality summaries, insights, and key quotes using AI.
+                    </p>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
                     >
-                      Try Again
-                    </button>
-                  )}
+                      Get your free key →
+                    </a>
+                  </Card>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {!result && !isProcessing && !error && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-[#39939E] max-w-md">
-                <FileAudio className="w-16 h-16 mx-auto mb-4 opacity-40" />
-                <p className="text-lg">{"Upload an audio file to start."}</p>
-                <p className="text-sm mt-2 opacity-70">{""}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Processing State */}
-          {isProcessing && (
-            <div className="flex items-center justify-center h-full">
-              <div className="flex flex-col items-center space-y-6">
-                <Loader2 className="w-12 h-12 text-[#01A0A9] animate-spin" />
-                <div className="text-center space-y-2">
-                  <h3 className="text-xl font-medium text-[#1B1823]">Processing audio</h3>
-                  <p className="text-[#39939E] text-center mx-32">
-                    {"This takes a few moments, a 5 minute file is usually ready in less than 20 seconds."}
+                <div className="pt-4">
+                  <p className="text-sm text-[#39939E]">
+                    Your API keys are stored securely in your browser and never sent to our servers.
                   </p>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Results */}
-          {result && !isProcessing && (
-            <div className="space-y-6 animate-in fade-in duration-500 mx-8 my-8">
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleDownloadInsights}
-                  className="bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium transition-all hover:shadow-[0_4px_12px_rgba(1,160,169,0.3)] text-center h-[30px] px-4"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Insights
-                </Button>
-              </div>
-
-              {/* Summary with Toggle */}
-              <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-medium text-[#1B1823]">Summary</h2>
-                  <div className="flex items-center gap-2 bg-white rounded-[8px] p-1 border border-[#E5E7EB]">
-                    <button
-                      onClick={() => setSummaryMode("paragraph")}
-                      className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-all ${
-                        summaryMode === "paragraph" ? "bg-[#01A0A9] text-white" : "text-[#39939E] hover:text-[#1B1823]"
+          ) : (
+            <>
+              {/* Error Message */}
+              {error && !result && !isProcessing && (
+                <div className="h-full flex items-center justify-center p-8">
+                  <div
+                    className={`p-8 rounded-[12px] max-w-lg text-center ${
+                      errorType === "quota"
+                        ? "bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] border-2 border-[#F59E0B]"
+                        : errorType === "auth"
+                          ? "bg-gradient-to-br from-[#FEE2E2] to-[#FECACA] border-2 border-[#EF4444]"
+                          : "bg-[#FEF2F2] border border-[#E73F36]"
+                    }`}
+                  >
+                    {/* Icon */}
+                    <div
+                      className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                        errorType === "quota"
+                          ? "bg-[#F59E0B]/20"
+                          : errorType === "auth"
+                            ? "bg-[#EF4444]/20"
+                            : "bg-[#E73F36]/10"
                       }`}
                     >
-                      Overview
-                    </button>
-                    <button
-                      onClick={() => setSummaryMode("bullets")}
-                      className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-all ${
-                        summaryMode === "bullets" ? "bg-[#01A0A9] text-white" : "text-[#39939E] hover:text-[#1B1823]"
+                      {errorType === "quota" ? (
+                        <svg className="w-8 h-8 text-[#D97706]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                      ) : errorType === "auth" ? (
+                        <svg className="w-8 h-8 text-[#EF4444]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                          />
+                        </svg>
+                      ) : (
+                        <svg className="w-8 h-8 text-[#E73F36]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h3
+                      className={`text-xl font-semibold mb-2 ${
+                        errorType === "quota"
+                          ? "text-[#92400E]"
+                          : errorType === "auth"
+                            ? "text-[#991B1B]"
+                            : "text-[#E73F36]"
                       }`}
                     >
-                      Bullets
-                    </button>
+                      {errorType === "quota"
+                        ? "Free Tier Limit Reached"
+                        : errorType === "auth"
+                          ? "Invalid API Key"
+                          : "Something Went Wrong"}
+                    </h3>
+
+                    {/* Message */}
+                    <p
+                      className={`text-sm leading-relaxed mb-4 ${
+                        errorType === "quota"
+                          ? "text-[#A16207]"
+                          : errorType === "auth"
+                            ? "text-[#B91C1C]"
+                            : "text-[#E73F36]"
+                      }`}
+                    >
+                      {error}
+                    </p>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-col gap-2">
+                      {errorType === "quota" && (
+                        <>
+                          <a
+                            href={
+                              errorSource === "gemini"
+                                ? "https://aistudio.google.com/app/apikey"
+                                : "https://www.assemblyai.com/dashboard"
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-white rounded-[8px] font-medium text-sm transition-colors"
+                          >
+                            {errorSource === "gemini" ? "Manage Gemini API" : "Upgrade AssemblyAI Plan"}
+                          </a>
+                          <p className="text-xs text-[#A16207] mt-2">Or wait for your quota to reset</p>
+                        </>
+                      )}
+                      {errorType === "auth" && (
+                        <button
+                          onClick={() => {
+                            setError("")
+                            setErrorType(null)
+                            setErrorSource(null)
+                          }}
+                          className="inline-flex items-center justify-center px-4 py-2 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-[8px] font-medium text-sm transition-colors"
+                        >
+                          Check {errorSource === "gemini" ? "Gemini" : "AssemblyAI"} Key
+                        </button>
+                      )}
+                      {errorType === "general" && (
+                        <button
+                          onClick={() => {
+                            setError("")
+                            setErrorType(null)
+                            setErrorSource(null)
+                          }}
+                          className="inline-flex items-center justify-center px-4 py-2 bg-[#E73F36] hover:bg-[#C53030] text-white rounded-[8px] font-medium text-sm transition-colors"
+                        >
+                          Try Again
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {summaryMode === "paragraph" ? (
-                  <p className="text-[#1B1823] leading-relaxed">{result.summaryParagraph}</p>
-                ) : (
-                  <ul className="space-y-3">
-                    {result.summaryBullets.map((bullet, index) => (
-                      <li key={index} className="flex gap-3">
-                        <span className="flex-shrink-0 w-2 h-2 bg-[#01A0A9] rounded-full mt-2"></span>
-                        <span className="text-[#1B1823] leading-relaxed">{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-
-              {/* Key Insights */}
-              <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                <h2 className="text-2xl font-medium text-[#1B1823] mb-4">Key Insights</h2>
-                <ul className="space-y-3">
-                  {result.takeaways.map((takeaway, index) => (
-                    <li key={index} className="flex gap-3">
-                      <span className="flex-shrink-0 w-6 h-6 bg-[#01A0A9] text-white rounded-full flex items-center justify-center text-sm font-medium">
-                        {index + 1}
-                      </span>
-                      <span className="text-[#1B1823] leading-relaxed pt-0.5">{takeaway}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-
-              {result.themes && result.themes.length > 0 && (
-                <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                  <h2 className="text-2xl font-medium text-[#1B1823] mb-4">Themes</h2>
-                  <div className="space-y-4">
-                    {(() => {
-                      // Sort themes by count (strongest first)
-                      const sortedThemes = [...result.themes!].sort((a, b) => (b.count || 1) - (a.count || 1))
-
-                      // Divide into three tiers
-                      const totalThemes = sortedThemes.length
-                      const tier1Count = Math.ceil(totalThemes * 0.3) // Top 30% - strongest
-                      const tier2Count = Math.ceil(totalThemes * 0.4) // Middle 40%
-
-                      const tier1 = sortedThemes.slice(0, tier1Count)
-                      const tier2 = sortedThemes.slice(tier1Count, tier1Count + tier2Count)
-                      const tier3 = sortedThemes.slice(tier1Count + tier2Count)
-
-                      return (
-                        <>
-                          {/* Row 1: Strongest themes - Large pills */}
-                          {tier1.length > 0 && (
-                            <div className="flex flex-wrap gap-3">
-                              {tier1.map((theme, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-block px-5 py-2.5 border-2 text-[#01A0A9] text-base font-medium rounded-full bg-card-foreground border-0"
-                                >
-                                  {theme.text}
-                                  {theme.count && theme.count > 1 && (
-                                    <span className="ml-2 text-sm opacity-70">×{theme.count}</span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Row 2: Medium strength themes - Medium pills */}
-                          {tier2.length > 0 && (
-                            <div className="flex flex-wrap gap-2.5">
-                              {tier2.map((theme, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-block px-4 py-2 border border-[#39939E] text-[#39939E] text-sm font-medium rounded-full bg-sidebar-primary-foreground"
-                                >
-                                  {theme.text}
-                                  {theme.count && theme.count > 1 && (
-                                    <span className="ml-1.5 text-xs opacity-60">×{theme.count}</span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Row 3: Weakest themes - Small pills */}
-                          {tier3.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {tier3.map((theme, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-block px-3 py-1.5 border border-[#E5E7EB] text-[#1B1823]/60 text-xs rounded-full bg-card"
-                                >
-                                  {theme.text}
-                                  {theme.count && theme.count > 1 && (
-                                    <span className="ml-1 text-[10px] opacity-50">×{theme.count}</span>
-                                  )}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </div>
-                </Card>
               )}
 
-              {result.sentimentSegments && result.sentimentSegments.length > 0 && (
-                <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                  <h2 className="text-2xl font-medium text-[#1B1823] mb-0">Sentiment</h2>
+              {/* Empty state */}
+              {!result && !isProcessing && !error && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-[#39939E] max-w-md">
+                    <FileAudio className="w-16 h-16 mx-auto mb-4 opacity-40" />
+                    <p className="text-lg">Upload an audio file to start.</p>
+                    <p className="text-sm mt-2 opacity-70">Drag and drop anywhere or use the upload button above.</p>
+                  </div>
+                </div>
+              )}
 
-                  {/* Overall Sentiment Pill */}
-                  <div className="mb-0">
-                    <span className="text-[#1B1823]/60 mr-3 text-foreground text-sm">Overall:</span>
-                    <span
-                      className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${
-                        result.overallSentiment === "POSITIVE"
-                          ? "bg-green-100 text-green-700 border border-green-300"
-                          : result.overallSentiment === "NEGATIVE"
-                            ? "bg-red-100 text-red-700 border border-red-300"
-                            : result.overallSentiment === "MIXED"
-                              ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
-                              : "bg-gray-100 text-gray-700 border border-gray-300"
-                      }`}
+              {/* Processing State */}
+              {isProcessing && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="flex flex-col items-center space-y-6">
+                    <Loader2 className="w-12 h-12 text-[#01A0A9] animate-spin" />
+                    <div className="text-center">
+                      <h3 className="text-xl font-medium text-[#1B1823] mb-2">Processing audio</h3>
+                      <p className="text-sm text-[#39939E]">
+                        This may take a few moments. A 5 minute file is usually ready in less than 20 seconds.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Results Display - remains the same */}
+              {result && !isProcessing && (
+                <div className="space-y-6 animate-in fade-in duration-500 mx-8 my-8">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleDownloadInsights}
+                      className="bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium transition-all hover:shadow-[0_4px_12px_rgba(1,160,169,0.3)] text-center h-[30px] px-4"
                     >
-                      {result.overallSentiment}
-                    </span>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Insights
+                    </Button>
                   </div>
 
-                  {/* Sentiment Timeline */}
-                  <div className="mb-6">
-                    <h3 className="font-medium text-[#1B1823] mb-[13px] text-sm">Timeline</h3>
-                    <div className="relative h-8 bg-[#E5E7EB] rounded-full overflow-hidden flex">
-                      {result.sentimentSegments.map((segment, index) => {
-                        const totalDuration = result.sentimentSegments![result.sentimentSegments!.length - 1].end
-                        const width = ((segment.end - segment.start) / totalDuration) * 100
+                  {/* Summary with Toggle */}
+                  <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-medium text-[#1B1823]">Summary</h2>
+                      <div className="flex items-center gap-2 bg-white rounded-[8px] p-1 border border-[#E5E7EB]">
+                        <button
+                          onClick={() => setSummaryMode("paragraph")}
+                          className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-all ${
+                            summaryMode === "paragraph"
+                              ? "bg-[#01A0A9] text-white"
+                              : "text-[#39939E] hover:text-[#1B1823]"
+                          }`}
+                        >
+                          Overview
+                        </button>
+                        <button
+                          onClick={() => setSummaryMode("bullets")}
+                          className={`px-4 py-2 rounded-[6px] text-sm font-medium transition-all ${
+                            summaryMode === "bullets"
+                              ? "bg-[#01A0A9] text-white"
+                              : "text-[#39939E] hover:text-[#1B1823]"
+                          }`}
+                        >
+                          Bullets
+                        </button>
+                      </div>
+                    </div>
 
-                        return (
-                          <div
-                            key={index}
-                            className={`relative group cursor-pointer transition-opacity hover:opacity-80 ${
-                              segment.sentiment === "POSITIVE"
-                                ? "bg-green-400"
-                                : segment.sentiment === "NEGATIVE"
-                                  ? "bg-red-400"
-                                  : segment.sentiment === "NEUTRAL"
-                                    ? "bg-gray-300"
-                                    : "bg-yellow-400"
-                            }`}
-                            style={{ width: `${width}%` }}
-                          >
-                            {/* Tooltip */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                              <div className="bg-[#1B1823] text-white text-xs rounded px-3 py-2 whitespace-nowrap shadow-lg">
-                                <div className="font-medium mb-1">{segment.sentiment}</div>
-                                <div className="opacity-80">
-                                  {Math.floor(segment.start / 60000)}:
-                                  {String(Math.floor((segment.start % 60000) / 1000)).padStart(2, "0")} -
-                                  {Math.floor(segment.end / 60000)}:
-                                  {String(Math.floor((segment.end % 60000) / 1000)).padStart(2, "0")}
+                    {summaryMode === "paragraph" ? (
+                      <p className="text-[#1B1823] leading-relaxed">{result.summaryParagraph}</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {result.summaryBullets.map((bullet, index) => (
+                          <li key={index} className="flex gap-3">
+                            <span className="flex-shrink-0 w-2 h-2 bg-[#01A0A9] rounded-full mt-2"></span>
+                            <span className="text-[#1B1823] leading-relaxed">{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Card>
+
+                  {/* Key Insights */}
+                  <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                    <h2 className="text-2xl font-medium text-[#1B1823] mb-4">Key Insights</h2>
+                    <ul className="space-y-3">
+                      {result.takeaways.map((takeaway, index) => (
+                        <li key={index} className="flex gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-[#01A0A9] text-white rounded-full flex items-center justify-center text-sm font-medium">
+                            {index + 1}
+                          </span>
+                          <span className="text-[#1B1823] leading-relaxed pt-0.5">{takeaway}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+
+                  {result.themes && result.themes.length > 0 && (
+                    <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                      <h2 className="text-2xl font-medium text-[#1B1823] mb-4">Themes</h2>
+                      <div className="space-y-4">
+                        {(() => {
+                          // Sort themes by count (strongest first)
+                          const sortedThemes = [...result.themes!].sort((a, b) => (b.count || 1) - (a.count || 1))
+
+                          // Divide into three tiers
+                          const totalThemes = sortedThemes.length
+                          const tier1Count = Math.ceil(totalThemes * 0.3) // Top 30% - strongest
+                          const tier2Count = Math.ceil(totalThemes * 0.4) // Middle 40%
+
+                          const tier1 = sortedThemes.slice(0, tier1Count)
+                          const tier2 = sortedThemes.slice(tier1Count, tier1Count + tier2Count)
+                          const tier3 = sortedThemes.slice(tier1Count + tier2Count)
+
+                          return (
+                            <>
+                              {/* Row 1: Strongest themes - Large pills */}
+                              {tier1.length > 0 && (
+                                <div className="flex flex-wrap gap-3">
+                                  {tier1.map((theme, index) => (
+                                    <span
+                                      key={index}
+                                      className="inline-block px-5 py-2.5 border-2 text-[#01A0A9] text-base font-medium rounded-full bg-card-foreground border-0"
+                                    >
+                                      {theme.text}
+                                      {theme.count && theme.count > 1 && (
+                                        <span className="ml-2 text-sm opacity-70">×{theme.count}</span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Row 2: Medium strength themes - Medium pills */}
+                              {tier2.length > 0 && (
+                                <div className="flex flex-wrap gap-2.5">
+                                  {tier2.map((theme, index) => (
+                                    <span
+                                      key={index}
+                                      className="inline-block px-4 py-2 border border-[#39939E] text-[#39939E] text-sm font-medium rounded-full bg-sidebar-primary-foreground"
+                                    >
+                                      {theme.text}
+                                      {theme.count && theme.count > 1 && (
+                                        <span className="ml-1.5 text-xs opacity-60">×{theme.count}</span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Row 3: Weakest themes - Small pills */}
+                              {tier3.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {tier3.map((theme, index) => (
+                                    <span
+                                      key={index}
+                                      className="inline-block px-3 py-1.5 border border-[#E5E7EB] text-[#1B1823]/60 text-xs rounded-full bg-card"
+                                    >
+                                      {theme.text}
+                                      {theme.count && theme.count > 1 && (
+                                        <span className="ml-1 text-[10px] opacity-50">×{theme.count}</span>
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </Card>
+                  )}
+
+                  {result.sentimentSegments && result.sentimentSegments.length > 0 && (
+                    <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                      <h2 className="text-2xl font-medium text-[#1B1823] mb-0">Sentiment</h2>
+
+                      {/* Overall Sentiment Pill */}
+                      <div className="mb-0">
+                        <span className="text-[#1B1823]/60 mr-3 text-foreground text-sm">Overall:</span>
+                        <span
+                          className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${
+                            result.overallSentiment === "POSITIVE"
+                              ? "bg-green-100 text-green-700 border border-green-300"
+                              : result.overallSentiment === "NEGATIVE"
+                                ? "bg-red-100 text-red-700 border border-red-300"
+                                : result.overallSentiment === "MIXED"
+                                  ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                  : "bg-gray-100 text-gray-700 border border-gray-300"
+                          }`}
+                        >
+                          {result.overallSentiment}
+                        </span>
+                      </div>
+
+                      {/* Sentiment Timeline */}
+                      <div className="mb-6">
+                        <h3 className="font-medium text-[#1B1823] mb-[13px] text-sm">Timeline</h3>
+                        <div className="relative h-8 bg-[#E5E7EB] rounded-full overflow-hidden flex">
+                          {result.sentimentSegments.map((segment, index) => {
+                            const totalDuration = result.sentimentSegments![result.sentimentSegments!.length - 1].end
+                            const width = ((segment.end - segment.start) / totalDuration) * 100
+
+                            return (
+                              <div
+                                key={index}
+                                className={`relative group cursor-pointer transition-opacity hover:opacity-80 ${
+                                  segment.sentiment === "POSITIVE"
+                                    ? "bg-green-400"
+                                    : segment.sentiment === "NEGATIVE"
+                                      ? "bg-red-400"
+                                      : segment.sentiment === "NEUTRAL"
+                                        ? "bg-gray-300"
+                                        : "bg-yellow-400"
+                                }`}
+                                style={{ width: `${width}%` }}
+                              >
+                                {/* Tooltip */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                                  <div className="bg-[#1B1823] text-white text-xs rounded px-3 py-2 whitespace-nowrap shadow-lg">
+                                    <div className="font-medium mb-1">{segment.sentiment}</div>
+                                    <div className="opacity-80">
+                                      {Math.floor(segment.start / 60000)}:
+                                      {String(Math.floor((segment.start % 60000) / 1000)).padStart(2, "0")} -
+                                      {Math.floor(segment.end / 60000)}:
+                                      {String(Math.floor((segment.end % 60000) / 1000)).padStart(2, "0")}
+                                    </div>
+                                  </div>
+                                  <div className="w-2 h-2 bg-[#1B1823] rotate-45 absolute top-full left-1/2 -translate-x-1/2 -mt-1" />
                                 </div>
                               </div>
-                              <div className="w-2 h-2 bg-[#1B1823] rotate-45 absolute top-full left-1/2 -translate-x-1/2 -mt-1" />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                            )
+                          })}
+                        </div>
+                      </div>
 
-                  {/* Speaker Sentiment Table */}
-                  {result.speakerSentiments && result.speakerSentiments.length > 0 && (
-                    <div>
-                      <h3 className="font-medium text-[#1B1823] mb-3 text-sm">By Speaker</h3>
-                      <div className="space-y-2">
-                        {result.speakerSentiments.map((speaker, index) => (
+                      {/* Speaker Sentiment Table */}
+                      {result.speakerSentiments && result.speakerSentiments.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-[#1B1823] mb-3 text-sm">By Speaker</h3>
+                          <div className="space-y-2">
+                            {result.speakerSentiments.map((speaker, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-3 bg-white border border-[#E5E7EB] rounded-lg"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium text-[#1B1823]">{speaker.speaker}</span>
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-medium ${
+                                      speaker.predominantSentiment === "POSITIVE"
+                                        ? "bg-green-100 text-green-700"
+                                        : speaker.predominantSentiment === "NEGATIVE"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {speaker.predominantSentiment}
+                                  </span>
+                                </div>
+                                <span className="text-sm text-[#1B1823]/60">{speaker.description}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  )}
+
+                  {/* Quotes */}
+                  <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                    <h2 className="text-2xl font-medium text-[#1B1823] mb-0">Quotes</h2>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* Positive Quotes Column */}
+                      <div>
+                        <h3 className="font-medium text-[#1B1823] mb-4 text-sm">Top Positive Quotes</h3>
+                        <div className="space-y-3">
+                          {result.positiveQuotes && result.positiveQuotes.length > 0 ? (
+                            result.positiveQuotes.map((quote, index) => (
+                              <div
+                                key={`positive-${index}`}
+                                className="pl-4 border-l-4 border-[#7AE241] bg-white rounded-r-md p-3"
+                              >
+                                <p className="text-[#39939E] italic leading-relaxed">"{quote.text}"</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-[#6B7280] text-sm italic">No positive quotes detected</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Negative Quotes Column */}
+                      <div>
+                        <h3 className="font-medium text-[#1B1823] mb-4 text-sm">Top Negative Quotes</h3>
+                        <div className="space-y-3">
+                          {result.negativeQuotes && result.negativeQuotes.length > 0 ? (
+                            result.negativeQuotes.map((quote, index) => (
+                              <div
+                                key={`negative-${index}`}
+                                className="pl-4 border-l-4 border-[#EF4444] bg-white rounded-r-md p-3"
+                              >
+                                <p className="text-[#39939E] italic leading-relaxed">"{quote.text}"</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-[#6B7280] text-sm italic">No negative quotes detected</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Full Transcript */}
+                  <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-medium text-[#1B1823]">Full Transcript</h2>
+                      <Button
+                        onClick={handleCopyTranscript}
+                        variant="outline"
+                        size="sm"
+                        className="text-[#01A0A9] border-[#01A0A9] hover:bg-[#01A0A9] hover:text-white transition-colors bg-transparent"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Copied!
+                          </>
+                        ) : (
+                          "Full Text (Raw)"
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="max-h-[500px] overflow-y-auto space-y-3 pr-2">
+                      {result.utterances && result.utterances.length > 0 ? (
+                        result.utterances.map((utterance, index) => (
                           <div
                             key={index}
-                            className="flex items-center justify-between p-3 bg-white border border-[#E5E7EB] rounded-lg"
+                            className={`p-4 rounded-[8px] border border-[#E5E7EB] transition-all hover:shadow-sm ${
+                              utterance.speaker === "B" ? "bg-[#ebf4f5]" : "bg-white"
+                            }`}
                           >
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium text-[#1B1823]">{speaker.speaker}</span>
-                              <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
-                                  speaker.predominantSentiment === "POSITIVE"
-                                    ? "bg-green-100 text-green-700"
-                                    : speaker.predominantSentiment === "NEGATIVE"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700"
-                                }`}
-                              >
-                                {speaker.predominantSentiment}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-[#01A0A9] bg-[#E5F5F6] px-2 py-1 rounded-[6px]">
+                                Speaker {utterance.speaker === "A" ? "1" : "2"}
                               </span>
                             </div>
-                            <span className="text-sm text-[#1B1823]/60">{speaker.description}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Quotes */}
-              <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                <h2 className="text-2xl font-medium text-[#1B1823] mb-0">Quotes</h2>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Positive Quotes Column */}
-                  <div>
-                    <h3 className="font-medium text-[#1B1823] mb-4 text-sm">Top Positive Quotes</h3>
-                    <div className="space-y-3">
-                      {result.positiveQuotes && result.positiveQuotes.length > 0 ? (
-                        result.positiveQuotes.map((quote, index) => (
-                          <div
-                            key={`positive-${index}`}
-                            className="pl-4 border-l-4 border-[#7AE241] bg-white rounded-r-md p-3"
-                          >
-                            <p className="text-[#39939E] italic leading-relaxed">"{quote.text}"</p>
+                            <p className="text-[#1B1823] leading-relaxed text-sm">{utterance.text}</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-[#6B7280] text-sm italic">No positive quotes detected</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Negative Quotes Column */}
-                  <div>
-                    <h3 className="font-medium text-[#1B1823] mb-4 text-sm">Top Negative Quotes</h3>
-                    <div className="space-y-3">
-                      {result.negativeQuotes && result.negativeQuotes.length > 0 ? (
-                        result.negativeQuotes.map((quote, index) => (
-                          <div
-                            key={`negative-${index}`}
-                            className="pl-4 border-l-4 border-[#EF4444] bg-white rounded-r-md p-3"
-                          >
-                            <p className="text-[#39939E] italic leading-relaxed">"{quote.text}"</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[#6B7280] text-sm italic">No negative quotes detected</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Full Transcript */}
-              <Card className="p-8 bg-[#F7F9F8] border-[#E5E7EB] rounded-[10px] shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-medium text-[#1B1823]">Full Transcript</h2>
-                  <Button
-                    onClick={handleCopyTranscript}
-                    variant="outline"
-                    size="sm"
-                    className="text-[#01A0A9] border-[#01A0A9] hover:bg-[#01A0A9] hover:text-white transition-colors bg-transparent"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Copied!
-                      </>
-                    ) : (
-                      "Full Text (Raw)"
-                    )}
-                  </Button>
-                </div>
-
-                <div className="max-h-[500px] overflow-y-auto space-y-3 pr-2">
-                  {result.utterances && result.utterances.length > 0 ? (
-                    result.utterances.map((utterance, index) => (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-[8px] border border-[#E5E7EB] transition-all hover:shadow-sm ${
-                          utterance.speaker === "B" ? "bg-[#ebf4f5]" : "bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-medium text-[#01A0A9] bg-[#E5F5F6] px-2 py-1 rounded-[6px]">
-                            Speaker {utterance.speaker === "A" ? "1" : "2"}
-                          </span>
+                        <div className="p-4 bg-white rounded-[8px] border border-[#E5E7EB]">
+                          <p className="text-[#1B1823] leading-relaxed whitespace-pre-wrap">{result.fullTranscript}</p>
                         </div>
-                        <p className="text-[#1B1823] leading-relaxed text-sm">{utterance.text}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 bg-white rounded-[8px] border border-[#E5E7EB]">
-                      <p className="text-[#1B1823] leading-relaxed whitespace-pre-wrap">{result.fullTranscript}</p>
+                      )}
                     </div>
-                  )}
+                  </Card>
                 </div>
-              </Card>
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
