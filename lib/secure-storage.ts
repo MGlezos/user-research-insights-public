@@ -3,9 +3,6 @@
 
 const STORAGE_KEY = "supersoniq_api_key"
 const GEMINI_STORAGE_KEY = "supersoniq_gemini_key"
-const OPENAI_STORAGE_KEY = "supersoniq_openai_key"
-const CLAUDE_STORAGE_KEY = "supersoniq_claude_key"
-const AI_PROVIDER_KEY = "supersoniq_ai_provider"
 const ENCRYPTION_KEY = "supersoniq-insights-v1"
 
 // Simple XOR-based encryption (sufficient for localStorage protection)
@@ -75,66 +72,4 @@ export function clearGeminiKey(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(GEMINI_STORAGE_KEY)
   }
-}
-
-// OpenAI API Key functions
-export function storeOpenAIKey(apiKey: string): void {
-  if (typeof window !== "undefined") {
-    const encrypted = encrypt(apiKey)
-    localStorage.setItem(OPENAI_STORAGE_KEY, encrypted)
-  }
-}
-
-export function retrieveOpenAIKey(): string {
-  if (typeof window !== "undefined") {
-    const encrypted = localStorage.getItem(OPENAI_STORAGE_KEY)
-    if (encrypted) {
-      return decrypt(encrypted)
-    }
-  }
-  return ""
-}
-
-export function clearOpenAIKey(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(OPENAI_STORAGE_KEY)
-  }
-}
-
-// Claude API Key functions
-export function storeClaudeKey(apiKey: string): void {
-  if (typeof window !== "undefined") {
-    const encrypted = encrypt(apiKey)
-    localStorage.setItem(CLAUDE_STORAGE_KEY, encrypted)
-  }
-}
-
-export function retrieveClaudeKey(): string {
-  if (typeof window !== "undefined") {
-    const encrypted = localStorage.getItem(CLAUDE_STORAGE_KEY)
-    if (encrypted) {
-      return decrypt(encrypted)
-    }
-  }
-  return ""
-}
-
-export function clearClaudeKey(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(CLAUDE_STORAGE_KEY)
-  }
-}
-
-// AI Provider selection functions
-export function storeAIProvider(provider: string): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(AI_PROVIDER_KEY, provider)
-  }
-}
-
-export function retrieveAIProvider(): string {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem(AI_PROVIDER_KEY) || "gemini"
-  }
-  return "gemini"
 }
