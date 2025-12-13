@@ -93,6 +93,10 @@ export default function Home() {
       alt: "Upload screen",
     },
     {
+      src: "/images/1-2-interview-insights-upload.jpg",
+      alt: "Processing audio",
+    },
+    {
       src: "/images/2-interview-insights-summarized.jpg",
       alt: "Summary and insights",
     },
