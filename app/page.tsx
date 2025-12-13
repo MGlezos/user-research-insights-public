@@ -12,10 +12,21 @@ import {
   storeApiKey,
   retrieveApiKey,
   clearApiKey,
-  storeGeminiKey,
-  retrieveGeminiKey,
-  clearGeminiKey,
+  storeAIKey,
+  retrieveAIKey,
+  clearAIKey,
+  storeAIProvider,
+  retrieveAIProvider,
+  AI_PROVIDER_CONFIG,
+  type AIProvider,
 } from "@/lib/secure-storage"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type Utterance = {
   speaker: string
@@ -69,9 +80,10 @@ export default function Home() {
   const [apiKey, setApiKey] = useState("")
   const [storedApiKey, setStoredApiKey] = useState("")
   const [isApiKeyStored, setIsApiKeyStored] = useState(false)
-  const [geminiKey, setGeminiKey] = useState("")
-  const [storedGeminiKey, setStoredGeminiKey] = useState("")
-  const [isGeminiKeyStored, setIsGeminiKeyStored] = useState(false)
+  const [aiKey, setAiKey] = useState("")
+  const [storedAiKey, setStoredAiKey] = useState("")
+  const [isAiKeyStored, setIsAiKeyStored] = useState(false)
+  const [aiProvider, setAiProvider] = useState<AIProvider>("gemini")
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<TranscriptionResult | null>(null)
@@ -128,11 +140,13 @@ export default function Home() {
       setStoredApiKey(savedKey)
       setIsApiKeyStored(true)
     }
-    const savedGeminiKey = retrieveGeminiKey()
-    if (savedGeminiKey) {
-      setStoredGeminiKey(savedGeminiKey)
-      setIsGeminiKeyStored(true)
+    const savedAiKey = retrieveAIKey()
+    if (savedAiKey) {
+      setStoredAiKey(savedAiKey)
+      setIsAiKeyStored(true)
     }
+    const savedProvider = retrieveAIProvider()
+    setAiProvider(savedProvider)
   }, [])
 
   useEffect(() => {
@@ -217,20 +231,32 @@ export default function Home() {
     setApiKey("")
   }
 
-  const handleStoreGeminiKey = () => {
-    if (geminiKey.trim()) {
-      storeGeminiKey(geminiKey)
-      setStoredGeminiKey(geminiKey)
-      setIsGeminiKeyStored(true)
-      setGeminiKey("")
+  const handleStoreAiKey = () => {
+    if (aiKey.trim()) {
+      storeAIKey(aiKey)
+      storeAIProvider(aiProvider)
+      setStoredAiKey(aiKey)
+      setIsAiKeyStored(true)
+      setAiKey("")
     }
   }
 
-  const handleRemoveGeminiKey = () => {
-    clearGeminiKey()
-    setStoredGeminiKey("")
-    setIsGeminiKeyStored(false)
-    setGeminiKey("")
+  const handleRemoveAiKey = () => {
+    clearAIKey()
+    setStoredAiKey("")
+    setIsAiKeyStored(false)
+    setAiKey("")
+  }
+
+  const handleAiProviderChange = (provider: AIProvider) => {
+    setAiProvider(provider)
+    storeAIProvider(provider)
+    // Clear the stored key when changing providers
+    if (isAiKeyStored) {
+      clearAIKey()
+      setStoredAiKey("")
+      setIsAiKeyStored(false)
+    }
   }
 
   const handleRemoveFile = () => {
@@ -377,22 +403,9 @@ export default function Home() {
       let geminiPositiveQuotes: SentimentQuote[] = []
       let geminiNegativeQuotes: SentimentQuote[] = []
 
-      // Use Gemini API for high-quality AI-generated insights (if key is available)
-      if (storedGeminiKey) {
-        try {
-          const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${storedGeminiKey}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
+      // Use AI API for high-quality AI-generated insights (if key is available)
+      if (storedAiKey) {
+        const aiPrompt = `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
 
 TRANSCRIPT TO ANALYZE:
 ${transcript.text}
@@ -437,23 +450,77 @@ STRICT REQUIREMENTS FOR EACH FIELD:
 6. KEY QUOTES (3 items):
    Three EXACT verbatim quotes that are the most memorable, insightful, or impactful statements from the transcript. These should capture the essence of the conversation.
 
-Return ONLY the JSON object. No other text.`,
-                      },
-                    ],
-                  },
-                ],
-                generationConfig: {
-                  temperature: 0.2,
-                  maxOutputTokens: 4096,
+Return ONLY the JSON object. No other text.`
+
+        try {
+          let aiResponse: Response
+          let responseText = ""
+
+          if (aiProvider === "gemini") {
+            // Gemini API call
+            aiResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${storedAiKey}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
                 },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: aiPrompt }] }],
+                  generationConfig: {
+                    temperature: 0.2,
+                    maxOutputTokens: 4096,
+                  },
+                }),
+              },
+            )
+
+            if (aiResponse.ok) {
+              const result = await aiResponse.json()
+              responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || ""
+            }
+          } else if (aiProvider === "openai") {
+            // OpenAI API call
+            aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${storedAiKey}`,
+              },
+              body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: aiPrompt }],
+                temperature: 0.2,
+                max_tokens: 4096,
               }),
-            },
-          )
+            })
 
-          if (geminiResponse.ok) {
-            const geminiResult = await geminiResponse.json()
-            const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text || ""
+            if (aiResponse.ok) {
+              const result = await aiResponse.json()
+              responseText = result.choices?.[0]?.message?.content || ""
+            }
+          } else if (aiProvider === "claude") {
+            // Claude API call via server-side proxy (to avoid CORS issues)
+            aiResponse = await fetch("/api/claude", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                apiKey: storedAiKey,
+                prompt: aiPrompt,
+              }),
+            })
 
+            if (aiResponse.ok) {
+              const result = await aiResponse.json()
+              responseText = result.content?.[0]?.text || ""
+            }
+          } else {
+            throw new Error("Invalid AI provider selected")
+          }
+
+          if (aiResponse!.ok && responseText) {
             try {
               // Clean the response - remove markdown code blocks if present
               const cleanedResponse = responseText
@@ -486,38 +553,43 @@ Return ONLY the JSON object. No other text.`,
                 }))
               }
             } catch (parseError) {
-              console.error("Failed to parse Gemini response:", parseError, responseText)
-              throw new Error("Failed to analyze transcript. Gemini returned an invalid response. Please try again.")
+              console.error(`Failed to parse ${AI_PROVIDER_CONFIG[aiProvider].name} response:`, parseError, responseText)
+              throw new Error(`Failed to analyze transcript. ${AI_PROVIDER_CONFIG[aiProvider].name} returned an invalid response. Please try again.`)
             }
           } else {
-            // Check for quota errors from Gemini
-            const errorText = await geminiResponse.text()
-            const errType = detectErrorType(geminiResponse.status, errorText)
+            // Check for quota/auth errors
+            const errorText = await aiResponse!.text()
+            const errType = detectErrorType(aiResponse!.status, errorText)
             setErrorType(errType)
-            setErrorSource("gemini")
+            setErrorSource("gemini") // Using "gemini" as generic AI error source for now
             if (errType === "quota") {
               throw new Error(
-                "Gemini API free tier limit reached. Please check your Gemini quota or upgrade your plan.",
+                `${AI_PROVIDER_CONFIG[aiProvider].name} rate limit reached. Please check your quota or upgrade your plan.`,
               )
             } else if (errType === "auth") {
-              throw new Error("Invalid Gemini API key. Please check your key and try again.")
+              throw new Error(`Invalid ${AI_PROVIDER_CONFIG[aiProvider].name} key. Please check your key and try again.`)
             } else {
-              throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`)
+              throw new Error(`${AI_PROVIDER_CONFIG[aiProvider].name} error: ${aiResponse!.status} - ${errorText}`)
             }
           }
-        } catch (geminiError) {
+        } catch (aiError) {
           // Re-throw if it's already a handled error
-          if (geminiError instanceof Error && geminiError.message.includes("Gemini")) {
-            throw geminiError
+          if (aiError instanceof Error && (
+            aiError.message.includes("API") || 
+            aiError.message.includes("rate limit") ||
+            aiError.message.includes("Invalid") ||
+            aiError.message.includes("Failed to analyze")
+          )) {
+            throw aiError
           }
-          console.error("Gemini API error:", geminiError)
-          throw new Error("Failed to connect to Gemini API. Please check your internet connection and try again.")
+          console.error(`${AI_PROVIDER_CONFIG[aiProvider].name} error:`, aiError)
+          throw new Error(`Failed to connect to ${AI_PROVIDER_CONFIG[aiProvider].name}. Please check your internet connection and try again.`)
         }
       }
 
-      // Verify Gemini provided all required data
+      // Verify AI provided all required data
       if (!summaryParagraph || summaryBullets.length === 0 || takeaways.length === 0) {
-        throw new Error("Gemini did not return complete analysis. Please try again.")
+        throw new Error(`${AI_PROVIDER_CONFIG[aiProvider].name} did not return complete analysis. Please try again.`)
       }
 
       const utterances: Utterance[] = transcript.utterances || []
@@ -893,7 +965,7 @@ Generated by Supersoniq Insights
           <div className="flex items-center">
             <Button
               onClick={handleTranscribe}
-              disabled={!file || !storedApiKey || !storedGeminiKey || isProcessing}
+              disabled={!file || !storedApiKey || !storedAiKey || isProcessing}
               className="h-9 px-8 bg-[#01A0A9] hover:bg-[#39939E] text-white font-medium rounded-[8px] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
             >
               {isProcessing ? (
@@ -963,10 +1035,10 @@ Generated by Supersoniq Insights
                     href="https://www.assemblyai.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-[#01A0A9] hover:underline font-medium"
+                    className="inline-flex items-center text-[#01A0A9] hover:opacity-80"
+                    title="Get Free API Key"
                   >
                     <Info className="w-4 h-4" />
-                    Get Free API Key
                   </a>
                 </div>
               ) : (
@@ -1007,36 +1079,55 @@ Generated by Supersoniq Insights
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-[#1B1823]">AI Summary</h3>
-                <img src="/images/gemini-logo.png" alt="Google Gemini" className="w-auto h-5" />
+                <img 
+                  src={AI_PROVIDER_CONFIG[aiProvider].logo} 
+                  alt={AI_PROVIDER_CONFIG[aiProvider].name} 
+                  className="w-auto h-5"
+                />
               </div>
 
-              {!isGeminiKeyStored ? (
+              {/* AI Provider Selector */}
+              <div className="space-y-2">
+                <label className="text-sm text-[#39939E]">AI Provider</label>
+                <Select value={aiProvider} onValueChange={(value: AIProvider) => handleAiProviderChange(value)}>
+                  <SelectTrigger className="w-full h-10 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white">
+                    <SelectValue placeholder="Select AI Provider" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-[#E5E7EB]">
+                    <SelectItem value="gemini">Gemini API</SelectItem>
+                    <SelectItem value="openai">OpenAI API</SelectItem>
+                    <SelectItem value="claude">Claude API</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!isAiKeyStored ? (
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <Input
-                      id="geminiKey"
+                      id="aiKey"
                       type="password"
                       placeholder="Enter API Key"
-                      value={geminiKey}
-                      onChange={(e) => setGeminiKey(e.target.value)}
+                      value={aiKey}
+                      onChange={(e) => setAiKey(e.target.value)}
                       className="flex-1 h-10 px-3 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white"
                     />
                     <Button
-                      onClick={handleStoreGeminiKey}
-                      disabled={!geminiKey.trim()}
+                      onClick={handleStoreAiKey}
+                      disabled={!aiKey.trim()}
                       className="h-10 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Save
                     </Button>
                   </div>
                   <a
-                    href="https://aistudio.google.com/app/apikey"
+                    href={AI_PROVIDER_CONFIG[aiProvider].keyLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-[#01A0A9] hover:underline font-medium"
+                    className="inline-flex items-center text-[#01A0A9] hover:opacity-80"
+                    title={AI_PROVIDER_CONFIG[aiProvider].keyLinkText}
                   >
                     <Info className="w-4 h-4" />
-                    Get Free API Key
                   </a>
                 </div>
               ) : (
@@ -1045,22 +1136,22 @@ Generated by Supersoniq Insights
                     <div className="flex items-center gap-3">
                       <Check className="w-5 h-5 text-[#7AE241]" />
                       <div>
-                        <p className="text-sm font-medium text-[#1B1823]">API Key Connected</p>
-                        <p className="text-xs text-[#39939E]">...{storedGeminiKey.slice(-4)}</p>
+                        <p className="text-sm font-medium text-[#1B1823]">{AI_PROVIDER_CONFIG[aiProvider].name} Connected</p>
+                        <p className="text-xs text-[#39939E]">...{storedAiKey.slice(-4)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <a
-                        href="https://aistudio.google.com/app/apikey"
+                        href={AI_PROVIDER_CONFIG[aiProvider].keyLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#01A0A9] hover:opacity-80"
-                        title="Get Gemini API Key"
+                        title={`Get ${AI_PROVIDER_CONFIG[aiProvider].name} Key`}
                       >
                         <Info className="w-5 h-5" />
                       </a>
                       <Button
-                        onClick={handleRemoveGeminiKey}
+                        onClick={handleRemoveAiKey}
                         variant="outline"
                         size="sm"
                         className="text-[#01A0A9] border-[#01A0A9] hover:bg-[#01A0A9] hover:text-white bg-transparent"
@@ -1079,14 +1170,14 @@ Generated by Supersoniq Insights
       {/* Bottom Row - Results */}
       <div className="flex-1 bg-white overflow-auto flex justify-center">
         <div className="w-full max-w-[75%] lg:max-w-[75%] md:max-w-[85%] sm:max-w-full px-4 sm:px-6 md:px-8 lg:px-10">
-          {!isApiKeyStored || !isGeminiKeyStored ? (
+          {!isApiKeyStored || !isAiKeyStored ? (
             <div className="h-full flex items-center justify-center p-12">
               <div className="max-w-2xl text-center space-y-8">
                 <div>
                   <h2 className="font-semibold text-[#1B1823] mb-4 text-4xl">
                     Turn user research recordings into actionable insights.
                   </h2>
-                  <p className="text-lg text-[#39939E] leading-relaxed">
+                  <p className="text-lg text-[#019FA8] leading-relaxed">
                     Enter your API keys to get started.{" "}
                     <button
                       onClick={() => setIsPreviewOpen(true)}
@@ -1097,14 +1188,15 @@ Generated by Supersoniq Insights
                   </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6 text-left">
+                <div className="grid md:grid-cols-2 gap-[44px] text-left">
                   <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
+                    <h3 className="text-sm font-medium text-[#B0B0B0] mb-0">Voice to Text</h3>
                     <div className="flex items-center gap-2 mb-[-15px]">
                       <img src="/images/assemblyai-logo.png" alt="AssemblyAI" className="h-6 w-auto" />
                     </div>
-                    <p className="text-sm text-[#39939E] mb-0 mt-0">
-                      Powers transcription with speaker labels and sentiment analysis. 330 hours free.
-                    </p>
+<p className="text-sm text-black mb-0 mt-0">
+                                      Powers transcription with speaker labels and sentiment analysis. 330 hours free.
+                                    </p>
                     {!isApiKeyStored ? (
                       <div className="space-y-3 mb-4">
                         <div className="flex gap-2">
@@ -1152,32 +1244,47 @@ Generated by Supersoniq Insights
                       href="https://www.assemblyai.com/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-thin text-sm"
                     >
                       Get a free key →
                     </a>
                   </Card>
 
                   <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
-                    <div className="flex items-center gap-2 mb-[-15px]">
-                      <img src="/images/gemini-logo.png" alt="Google Gemini" className="h-5 w-auto" />
+                    <h3 className="text-sm font-medium text-[#B0B0B0] mb-0">AI Summary</h3>
+                    <div className="flex items-center justify-between gap-2 mb-[-15px]">
+                      <img 
+                        src={AI_PROVIDER_CONFIG[aiProvider].logo} 
+                        alt={AI_PROVIDER_CONFIG[aiProvider].name} 
+                        className="h-6 w-auto"
+                      />
+                      <Select value={aiProvider} onValueChange={(value: AIProvider) => handleAiProviderChange(value)}>
+                        <SelectTrigger className="w-[140px] h-7 border-[#E5E7EB] rounded-[6px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white text-xs">
+                          <SelectValue placeholder="Select AI" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-[#E5E7EB]">
+                          <SelectItem value="gemini" className="text-sm">Gemini API</SelectItem>
+                          <SelectItem value="openai" className="text-sm">OpenAI API</SelectItem>
+                          <SelectItem value="claude" className="text-sm">Claude API</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <p className="text-sm text-[#39939E] mb-0 mt-0">
+                    <p className="text-sm text-black mb-0 mt-0">
                       Makes high-quality summaries, insights, and quotes using AI. $5 for credits.
                     </p>
-                    {!isGeminiKeyStored ? (
+                    {!isAiKeyStored ? (
                       <div className="space-y-3 mb-4">
                         <div className="flex gap-2">
                           <Input
                             type="password"
                             placeholder="Enter API Key"
-                            value={geminiKey}
-                            onChange={(e) => setGeminiKey(e.target.value)}
+                            value={aiKey}
+                            onChange={(e) => setAiKey(e.target.value)}
                             className="flex-1 h-9 px-3 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white text-sm"
                           />
                           <Button
-                            onClick={handleStoreGeminiKey}
-                            disabled={!geminiKey.trim()}
+                            onClick={handleStoreAiKey}
+                            disabled={!aiKey.trim()}
                             className="h-9 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                           >
                             Go
@@ -1186,19 +1293,19 @@ Generated by Supersoniq Insights
                       </div>
                     ) : (
                       <div className="flex items-center justify-between h-9 px-3 border border-[#E5E7EB] rounded-[8px] bg-white mb-4">
-                        <span className="text-sm text-[#1B1823]">...{storedGeminiKey.slice(-4)}</span>
+                        <span className="text-sm text-[#1B1823]">...{storedAiKey.slice(-4)}</span>
                         <div className="flex items-center gap-2">
                           <a
-                            href="https://aistudio.google.com/app/apikey"
+                            href={AI_PROVIDER_CONFIG[aiProvider].keyLink}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[#01A0A9] hover:opacity-80"
-                            title="Get Gemini API Key"
+                            title={`Get ${AI_PROVIDER_CONFIG[aiProvider].name} Key`}
                           >
                             <Info className="w-4 h-4" />
                           </a>
                           <Button
-                            onClick={handleRemoveGeminiKey}
+                            onClick={handleRemoveAiKey}
                             variant="ghost"
                             size="sm"
                             className="h-7 px-3 text-[#01A0A9] hover:bg-[#01A0A9] hover:text-white text-xs"
@@ -1209,12 +1316,12 @@ Generated by Supersoniq Insights
                       </div>
                     )}
                     <a
-                      href="https://aistudio.google.com/app/apikey"
+                      href={AI_PROVIDER_CONFIG[aiProvider].keyLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-thin text-sm"
                     >
-                      Get a free key →
+                      {AI_PROVIDER_CONFIG[aiProvider].keyLinkText}
                     </a>
                   </Card>
                 </div>
@@ -1872,3 +1979,4 @@ Generated by Supersoniq Insights
     </div>
   )
 }
+

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 24" fill="none">
+  <g transform="translate(0, 2)">
+    <path d="M10 0L11.5 6.5L18 5L13.5 10L18 15L11.5 13.5L10 20L8.5 13.5L2 15L6.5 10L2 5L8.5 6.5L10 0Z" fill="#D97757"/>
+  </g>
+  <text x="24" y="17" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#191918">Claude</text>
+</svg>

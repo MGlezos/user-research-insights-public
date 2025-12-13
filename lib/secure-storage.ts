@@ -2,8 +2,33 @@
 // Uses browser's built-in crypto API for basic encryption
 
 const STORAGE_KEY = "supersoniq_api_key"
-const GEMINI_STORAGE_KEY = "supersoniq_gemini_key"
+const AI_PROVIDER_KEY = "supersoniq_ai_provider"
+const AI_API_KEY = "supersoniq_ai_key"
 const ENCRYPTION_KEY = "supersoniq-insights-v1"
+
+// AI Provider types
+export type AIProvider = "gemini" | "openai" | "claude"
+
+export const AI_PROVIDER_CONFIG = {
+  gemini: {
+    name: "Gemini API",
+    keyLink: "https://aistudio.google.com/app/api-keys",
+    keyLinkText: "Get a free Gemini key →",
+    logo: "/images/gemini-logo.png",
+  },
+  openai: {
+    name: "OpenAI API",
+    keyLink: "https://platform.openai.com/api-keys",
+    keyLinkText: "Get a free OpenAI key →",
+    logo: "/images/openai-logo.png",
+  },
+  claude: {
+    name: "Claude API",
+    keyLink: "https://console.anthropic.com/settings/keys",
+    keyLinkText: "Get a free Claude key →",
+    logo: "/images/claude-logo.png",
+  },
+} as const
 
 // Simple XOR-based encryption (sufficient for localStorage protection)
 function encrypt(text: string): string {
@@ -27,6 +52,7 @@ function decrypt(encrypted: string): string {
   }
 }
 
+// AssemblyAI API Key functions
 export function storeApiKey(apiKey: string): void {
   if (typeof window !== "undefined") {
     const encrypted = encrypt(apiKey)
@@ -50,17 +76,40 @@ export function clearApiKey(): void {
   }
 }
 
-// Gemini API Key functions
-export function storeGeminiKey(apiKey: string): void {
+// AI Provider functions
+export function storeAIProvider(provider: AIProvider): void {
   if (typeof window !== "undefined") {
-    const encrypted = encrypt(apiKey)
-    localStorage.setItem(GEMINI_STORAGE_KEY, encrypted)
+    localStorage.setItem(AI_PROVIDER_KEY, provider)
   }
 }
 
-export function retrieveGeminiKey(): string {
+export function retrieveAIProvider(): AIProvider {
   if (typeof window !== "undefined") {
-    const encrypted = localStorage.getItem(GEMINI_STORAGE_KEY)
+    const provider = localStorage.getItem(AI_PROVIDER_KEY) as AIProvider | null
+    if (provider && ["gemini", "openai", "claude"].includes(provider)) {
+      return provider
+    }
+  }
+  return "gemini" // Default to Gemini
+}
+
+export function clearAIProvider(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AI_PROVIDER_KEY)
+  }
+}
+
+// AI API Key functions (replaces Gemini-specific functions)
+export function storeAIKey(apiKey: string): void {
+  if (typeof window !== "undefined") {
+    const encrypted = encrypt(apiKey)
+    localStorage.setItem(AI_API_KEY, encrypted)
+  }
+}
+
+export function retrieveAIKey(): string {
+  if (typeof window !== "undefined") {
+    const encrypted = localStorage.getItem(AI_API_KEY)
     if (encrypted) {
       return decrypt(encrypted)
     }
@@ -68,8 +117,23 @@ export function retrieveGeminiKey(): string {
   return ""
 }
 
-export function clearGeminiKey(): void {
+export function clearAIKey(): void {
   if (typeof window !== "undefined") {
-    localStorage.removeItem(GEMINI_STORAGE_KEY)
+    localStorage.removeItem(AI_API_KEY)
   }
+}
+
+// Legacy Gemini functions for backward compatibility (deprecated)
+// These will read from the new AI key storage
+export function storeGeminiKey(apiKey: string): void {
+  storeAIKey(apiKey)
+  storeAIProvider("gemini")
+}
+
+export function retrieveGeminiKey(): string {
+  return retrieveAIKey()
+}
+
+export function clearGeminiKey(): void {
+  clearAIKey()
 }
