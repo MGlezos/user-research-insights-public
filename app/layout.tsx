@@ -8,7 +8,7 @@ const cabin = Cabin({ subsets: ["latin"], variable: "--font-cabin" })
 const oswald = Oswald({ subsets: ["latin"], variable: "--font-oswald" })
 
 export const metadata: Metadata = {
-  title: "Supersoniq Insights",
+  title: "Supersoniq Interview Insights",
   description: "Audio transcription and insights powered by Assembly AI",
   generator: "v0.app",
   icons: {
