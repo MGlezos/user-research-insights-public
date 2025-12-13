@@ -15,7 +15,10 @@ import {
   storeGeminiKey,
   retrieveGeminiKey,
   clearGeminiKey,
+  storeAIProvider,
+  retrieveAIProvider,
 } from "@/lib/secure-storage"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type Utterance = {
   speaker: string
@@ -72,6 +75,7 @@ export default function Home() {
   const [geminiKey, setGeminiKey] = useState("")
   const [storedGeminiKey, setStoredGeminiKey] = useState("")
   const [isGeminiKeyStored, setIsGeminiKeyStored] = useState(false)
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "claude">("gemini")
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<TranscriptionResult | null>(null)
@@ -95,6 +99,8 @@ export default function Home() {
       setStoredGeminiKey(savedGeminiKey)
       setIsGeminiKeyStored(true)
     }
+    const savedProvider = retrieveAIProvider()
+    setAiProvider(savedProvider)
   }, [])
 
   useEffect(() => {
@@ -193,6 +199,50 @@ export default function Home() {
     setStoredGeminiKey("")
     setIsGeminiKeyStored(false)
     setGeminiKey("")
+  }
+
+  const handleAIProviderChange = (provider: "gemini" | "openai" | "claude") => {
+    setAiProvider(provider)
+    storeAIProvider(provider)
+  }
+
+  const getAPIKeyLink = () => {
+    switch (aiProvider) {
+      case "gemini":
+        return "https://aistudio.google.com/app/api-keys"
+      case "openai":
+        return "https://platform.openai.com/api-keys"
+      case "claude":
+        return "https://console.anthropic.com/settings/keys"
+      default:
+        return "https://aistudio.google.com/app/api-keys"
+    }
+  }
+
+  const getProviderLogo = () => {
+    switch (aiProvider) {
+      case "gemini":
+        return "/images/gemini-logo.png"
+      case "openai":
+        return "/images/openai-logo.jpg"
+      case "claude":
+        return "/images/claude-logo.jpg"
+      default:
+        return "/images/gemini-logo.png"
+    }
+  }
+
+  const getProviderName = () => {
+    switch (aiProvider) {
+      case "gemini":
+        return "Google Gemini"
+      case "openai":
+        return "OpenAI"
+      case "claude":
+        return "Anthropic Claude"
+      default:
+        return "Google Gemini"
+    }
   }
 
   const handleRemoveFile = () => {
@@ -339,22 +389,25 @@ export default function Home() {
       let geminiPositiveQuotes: SentimentQuote[] = []
       let geminiNegativeQuotes: SentimentQuote[] = []
 
-      // Use Gemini API for high-quality AI-generated insights (if key is available)
+      // Use AI API for high-quality AI-generated insights (if key is available)
       if (storedGeminiKey) {
         try {
-          const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${storedGeminiKey}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
+          let aiResponse
+
+          if (aiProvider === "gemini") {
+            aiResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${storedGeminiKey}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      parts: [
+                        {
+                          text: `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
 
 TRANSCRIPT TO ANALYZE:
 ${transcript.text}
@@ -400,21 +453,162 @@ STRICT REQUIREMENTS FOR EACH FIELD:
    Three EXACT verbatim quotes that are the most memorable, insightful, or impactful statements from the transcript. These should capture the essence of the conversation.
 
 Return ONLY the JSON object. No other text.`,
-                      },
-                    ],
+                        },
+                      ],
+                    },
+                  ],
+                  generationConfig: {
+                    temperature: 0.2,
+                    maxOutputTokens: 4096,
+                  },
+                }),
+              },
+            )
+          } else if (aiProvider === "openai") {
+            aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${storedGeminiKey}`,
+              },
+              body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "You are an expert user research analyst specializing in extracting actionable insights from interview transcripts.",
+                  },
+                  {
+                    role: "user",
+                    content: `TRANSCRIPT TO ANALYZE:
+${transcript.text}
+
+Analyze this transcript thoroughly and return ONLY a JSON object (no markdown, no code blocks, no explanations) with this exact structure:
+
+{
+  "summary": "Your summary here",
+  "bullets": ["bullet 1", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
+  "keyInsights": ["insight 1", "insight 2", "insight 3", "insight 4", "insight 5"],
+  "positiveQuotes": ["quote 1", "quote 2", "quote 3"],
+  "negativeQuotes": ["quote 1", "quote 2", "quote 3"],
+  "keyQuotes": ["quote 1", "quote 2", "quote 3"]
+}
+
+STRICT REQUIREMENTS FOR EACH FIELD:
+
+1. SUMMARY (4-6 sentences, 80-150 words):
+   Write a comprehensive paragraph that a product manager could read to understand the entire conversation. Include:
+   - Who participated and the context of the discussion
+   - The main topics and themes covered
+   - Key problems, needs, or pain points mentioned
+   - Any decisions, conclusions, or next steps discussed
+   - The overall tone and sentiment of the conversation
+
+2. BULLETS (5 items, each 15-25 words):
+   Five distinct bullet points that each summarize a different key topic or theme from the conversation. Each bullet should be a complete thought that stands alone.
+
+3. KEY INSIGHTS (5 items, each 20-40 words):
+   Five actionable insights that a product team could act on. Each MUST be a complete sentence that:
+   - Identifies a specific user need, problem, or opportunity
+   - Explains WHY it matters or what it implies
+   - Example format: "Users expressed significant frustration with [specific issue], suggesting that [implication or recommendation]."
+   DO NOT write single words or short phrases. Each insight must be a full, actionable sentence.
+
+4. POSITIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express satisfaction, praise, excitement, or positive feedback. Copy the exact words spoken. If fewer than 3 positive quotes exist, include what you can find.
+
+5. NEGATIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express frustration, criticism, concerns, or negative feedback. Copy the exact words spoken. If fewer than 3 negative quotes exist, include what you can find.
+
+6. KEY QUOTES (3 items):
+   Three EXACT verbatim quotes that are the most memorable, insightful, or impactful statements from the transcript. These should capture the essence of the conversation.
+
+Return ONLY the JSON object. No other text.`,
                   },
                 ],
-                generationConfig: {
-                  temperature: 0.2,
-                  maxOutputTokens: 4096,
-                },
+                temperature: 0.2,
+                response_format: { type: "json_object" },
               }),
-            },
-          )
+            })
+          } else if (aiProvider === "claude") {
+            aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": storedGeminiKey,
+                "anthropic-version": "2023-06-01",
+              },
+              body: JSON.stringify({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 4096,
+                messages: [
+                  {
+                    role: "user",
+                    content: `You are an expert user research analyst specializing in extracting actionable insights from interview transcripts. Your job is to help product teams understand what users said and what it means for their product.
 
-          if (geminiResponse.ok) {
-            const geminiResult = await geminiResponse.json()
-            const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text || ""
+TRANSCRIPT TO ANALYZE:
+${transcript.text}
+
+Analyze this transcript thoroughly and return ONLY a JSON object (no markdown, no code blocks, no explanations) with this exact structure:
+
+{
+  "summary": "Your summary here",
+  "bullets": ["bullet 1", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
+  "keyInsights": ["insight 1", "insight 2", "insight 3", "insight 4", "insight 5"],
+  "positiveQuotes": ["quote 1", "quote 2", "quote 3"],
+  "negativeQuotes": ["quote 1", "quote 2", "quote 3"],
+  "keyQuotes": ["quote 1", "quote 2", "quote 3"]
+}
+
+STRICT REQUIREMENTS FOR EACH FIELD:
+
+1. SUMMARY (4-6 sentences, 80-150 words):
+   Write a comprehensive paragraph that a product manager could read to understand the entire conversation. Include:
+   - Who participated and the context of the discussion
+   - The main topics and themes covered
+   - Key problems, needs, or pain points mentioned
+   - Any decisions, conclusions, or next steps discussed
+   - The overall tone and sentiment of the conversation
+
+2. BULLETS (5 items, each 15-25 words):
+   Five distinct bullet points that each summarize a different key topic or theme from the conversation. Each bullet should be a complete thought that stands alone.
+
+3. KEY INSIGHTS (5 items, each 20-40 words):
+   Five actionable insights that a product team could act on. Each MUST be a complete sentence that:
+   - Identifies a specific user need, problem, or opportunity
+   - Explains WHY it matters or what it implies
+   - Example format: "Users expressed significant frustration with [specific issue], suggesting that [implication or recommendation]."
+   DO NOT write single words or short phrases. Each insight must be a full, actionable sentence.
+
+4. POSITIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express satisfaction, praise, excitement, or positive feedback. Copy the exact words spoken. If fewer than 3 positive quotes exist, include what you can find.
+
+5. NEGATIVE QUOTES (3 items):
+   Three EXACT verbatim quotes from the transcript that express frustration, criticism, concerns, or negative feedback. Copy the exact words spoken. If fewer than 3 negative quotes exist, include what you can find.
+
+6. KEY QUOTES (3 items):
+   Three EXACT verbatim quotes that are the most memorable, insightful, or impactful statements from the transcript. These should capture the essence of the conversation.
+
+Return ONLY the JSON object. No other text.`,
+                  },
+                ],
+                temperature: 0.2,
+              }),
+            })
+          }
+
+          if (aiResponse && aiResponse.ok) {
+            const aiResult = await aiResponse.json()
+            let responseText = ""
+
+            if (aiProvider === "gemini") {
+              responseText = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || ""
+            } else if (aiProvider === "openai") {
+              responseText = aiResult.choices?.[0]?.message?.content || ""
+            } else if (aiProvider === "claude") {
+              responseText = aiResult.content?.[0]?.text || ""
+            }
 
             try {
               // Clean the response - remove markdown code blocks if present
@@ -448,38 +642,48 @@ Return ONLY the JSON object. No other text.`,
                 }))
               }
             } catch (parseError) {
-              console.error("Failed to parse Gemini response:", parseError, responseText)
-              throw new Error("Failed to analyze transcript. Gemini returned an invalid response. Please try again.")
+              console.error("Failed to parse AI response:", parseError, responseText)
+              throw new Error(
+                `Failed to analyze transcript. ${getProviderName()} returned an invalid response. Please try again.`,
+              )
             }
-          } else {
-            // Check for quota errors from Gemini
-            const errorText = await geminiResponse.text()
-            const errType = detectErrorType(geminiResponse.status, errorText)
+          } else if (aiResponse) {
+            // Check for quota errors from AI provider
+            const errorText = await aiResponse.text()
+            const errType = detectErrorType(aiResponse.status, errorText)
             setErrorType(errType)
             setErrorSource("gemini")
             if (errType === "quota") {
               throw new Error(
-                "Gemini API free tier limit reached. Please check your Gemini quota or upgrade your plan.",
+                `${getProviderName()} API free tier limit reached. Please check your quota or upgrade your plan.`,
               )
             } else if (errType === "auth") {
-              throw new Error("Invalid Gemini API key. Please check your key and try again.")
+              throw new Error(`Invalid ${getProviderName()} API key. Please check your key and try again.`)
             } else {
-              throw new Error(`Gemini API error: ${geminiResponse.status} - ${errorText}`)
+              throw new Error(`${getProviderName()} API error: ${aiResponse.status} - ${errorText}`)
             }
           }
-        } catch (geminiError) {
+        } catch (aiError) {
           // Re-throw if it's already a handled error
-          if (geminiError instanceof Error && geminiError.message.includes("Gemini")) {
-            throw geminiError
+          if (
+            aiError instanceof Error &&
+            (aiError.message.includes("Gemini") ||
+              aiError.message.includes("OpenAI") ||
+              aiError.message.includes("Claude") ||
+              aiError.message.includes(getProviderName()))
+          ) {
+            throw aiError
           }
-          console.error("Gemini API error:", geminiError)
-          throw new Error("Failed to connect to Gemini API. Please check your internet connection and try again.")
+          console.error(`${getProviderName()} API error:`, aiError)
+          throw new Error(
+            `Failed to connect to ${getProviderName()} API. Please check your internet connection and try again.`,
+          )
         }
       }
 
-      // Verify Gemini provided all required data
+      // Verify AI provided all required data
       if (!summaryParagraph || summaryBullets.length === 0 || takeaways.length === 0) {
-        throw new Error("Gemini did not return complete analysis. Please try again.")
+        throw new Error(`${getProviderName()} did not return complete analysis. Please try again.`)
       }
 
       const utterances: Utterance[] = transcript.utterances || []
@@ -794,7 +998,7 @@ Generated by Supersoniq Insights
 
   return (
     // Added className for the main container
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen bg-background text-foreground font-sans flex flex-col">
       {/* Drag and Drop Overlay */}
       {isDragging && (
         <div className="fixed inset-0 z-50 bg-[#B9D6D9]/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
@@ -881,6 +1085,7 @@ Generated by Supersoniq Insights
         </div>
       </div>
 
+      {/* Settings Drawer */}
       <Drawer direction="right" open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DrawerContent className="bg-[#B9D6D9] border-l-2 border-[#01A0A9]">
           <DrawerHeader>
@@ -969,7 +1174,39 @@ Generated by Supersoniq Insights
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-[#1B1823]">AI Summary</h3>
-                <img src="/images/gemini-logo.png" alt="Google Gemini" className="w-auto h-5" />
+                <Select value={aiProvider} onValueChange={handleAIProviderChange}>
+                  <SelectTrigger className="w-[140px] h-8 border-[#E5E7EB] bg-white">
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={getProviderLogo() || "/placeholder.svg"}
+                          alt={getProviderName()}
+                          className="h-4 w-auto"
+                        />
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gemini">
+                      <div className="flex items-center gap-2">
+                        <img src="/images/gemini-logo.png" alt="Google Gemini" className="h-4 w-auto" />
+                        <span>Gemini</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="openai">
+                      <div className="flex items-center gap-2">
+                        <img src="/images/openai-logo.jpg" alt="OpenAI" className="h-4 w-auto" />
+                        <span>OpenAI</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="claude">
+                      <div className="flex items-center gap-2">
+                        <img src="/images/claude-logo.jpg" alt="Claude" className="h-4 w-auto" />
+                        <span>Claude</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {!isGeminiKeyStored ? (
@@ -992,7 +1229,7 @@ Generated by Supersoniq Insights
                     </Button>
                   </div>
                   <a
-                    href="https://aistudio.google.com/app/apikey"
+                    href={getAPIKeyLink()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-[#01A0A9] hover:underline font-medium"
@@ -1013,11 +1250,11 @@ Generated by Supersoniq Insights
                     </div>
                     <div className="flex items-center gap-2">
                       <a
-                        href="https://aistudio.google.com/app/apikey"
+                        href={getAPIKeyLink()}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#01A0A9] hover:opacity-80"
-                        title="Get Gemini API Key"
+                        title={`Get ${getProviderName()} API Key`}
                       >
                         <Info className="w-5 h-5" />
                       </a>
@@ -1041,9 +1278,10 @@ Generated by Supersoniq Insights
       {/* Bottom Row - Results */}
       <div className="flex-1 bg-white overflow-auto flex justify-center">
         <div className="w-full max-w-[75%] lg:max-w-[75%] md:max-w-[85%] sm:max-w-full px-4 sm:px-6 md:px-8 lg:px-10">
-          {!isApiKeyStored || !isGeminiKeyStored ? (
-            <div className="h-full flex items-center justify-center p-12">
-              <div className="max-w-2xl text-center space-y-8">
+          {/* Splash Page */}
+          {(!isApiKeyStored || !isGeminiKeyStored) && (
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="max-w-4xl w-full space-y-8">
                 <div>
                   <h2 className="font-semibold text-[#1B1823] mb-4 text-4xl">
                     Turn user research recordings into actionable insights.
@@ -1057,7 +1295,7 @@ Generated by Supersoniq Insights
                       <img src="/images/assemblyai-logo.png" alt="AssemblyAI" className="h-6 w-auto" />
                     </div>
                     <p className="text-sm text-[#39939E] mb-0 mt-0">
-                      Powers transcription with speaker labels and sentiment analysis. 330 hours free.    
+                      Powers transcription with speaker labels and sentiment analysis. 330 hours free.
                     </p>
                     {!isApiKeyStored ? (
                       <div className="space-y-3 mb-4">
@@ -1112,12 +1350,46 @@ Generated by Supersoniq Insights
                     </a>
                   </Card>
 
+                  {/* AI Summary Card */}
                   <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
-                    <div className="flex items-center gap-2 mb-[-15px]">
-                      <img src="/images/gemini-logo.png" alt="Google Gemini" className="h-5 w-auto" />
+                    <div className="flex items-center justify-between mb-2">
+                      <Select value={aiProvider} onValueChange={handleAIProviderChange}>
+                        <SelectTrigger className="w-[160px] h-8 border-[#E5E7EB] bg-white">
+                          <SelectValue>
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={getProviderLogo() || "/placeholder.svg"}
+                                alt={getProviderName()}
+                                className="h-4 w-auto"
+                              />
+                            </div>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gemini">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/gemini-logo.png" alt="Google Gemini" className="h-4 w-auto" />
+                              <span className="text-sm">Gemini</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="openai">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/openai-logo.jpg" alt="OpenAI" className="h-4 w-auto" />
+                              <span className="text-sm">OpenAI</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="claude">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/claude-logo.jpg" alt="Claude" className="h-4 w-auto" />
+                              <span className="text-sm">Claude</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm font-semibold text-[#1B1823]">API Key</span>
                     </div>
-                    <p className="text-sm text-[#39939E] mb-0 mt-0">
-                      Makes high-quality summaries, insights, and quotes using AI. $5 for credits.      
+                    <p className="text-sm text-[#39939E] mb-4">
+                      Makes high-quality summaries, insights, and quotes using AI.
                     </p>
                     {!isGeminiKeyStored ? (
                       <div className="space-y-3 mb-4">
@@ -1143,11 +1415,11 @@ Generated by Supersoniq Insights
                         <span className="text-sm text-[#1B1823]">...{storedGeminiKey.slice(-4)}</span>
                         <div className="flex items-center gap-2">
                           <a
-                            href="https://aistudio.google.com/app/apikey"
+                            href={getAPIKeyLink()}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[#01A0A9] hover:opacity-80"
-                            title="Get Gemini API Key"
+                            title={`Get ${getProviderName()} API Key`}
                           >
                             <Info className="w-4 h-4" />
                           </a>
@@ -1163,7 +1435,180 @@ Generated by Supersoniq Insights
                       </div>
                     )}
                     <a
-                      href="https://aistudio.google.com/app/apikey"
+                      href={getAPIKeyLink()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
+                    >
+                      Get a free key →
+                    </a>
+                  </Card>
+                </div>
+
+                {/* CHANGE> Updated download link to point to sample audio file with underline */}
+                <div className="pt-4"></div>
+              </div>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {!isApiKeyStored || !isGeminiKeyStored ? (
+            <div className="h-full flex items-center justify-center p-12">
+              <div className="max-w-2xl text-center space-y-8">
+                <div>
+                  <h2 className="font-semibold text-[#1B1823] mb-4 text-4xl">
+                    Turn user research recordings into actionable insights.
+                  </h2>
+                  <p className="text-lg text-[#39939E] leading-relaxed">Enter your API keys to get started.</p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 text-left">
+                  <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
+                    <div className="flex items-center gap-2 mb-[-15px]">
+                      <img src="/images/assemblyai-logo.png" alt="AssemblyAI" className="h-6 w-auto" />
+                    </div>
+                    <p className="text-sm text-[#39939E] mb-0 mt-0">
+                      Powers transcription with speaker labels and sentiment analysis. 330 hours free.
+                    </p>
+                    {!isApiKeyStored ? (
+                      <div className="space-y-3 mb-4">
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            placeholder="Enter API Key"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            className="flex-1 h-9 px-3 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white text-sm"
+                          />
+                          <Button
+                            onClick={handleStoreApiKey}
+                            disabled={!apiKey.trim()}
+                            className="h-9 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          >
+                            Go
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between h-9 px-3 border border-[#E5E7EB] rounded-[8px] bg-white mb-4">
+                        <span className="text-sm text-[#1B1823]">...{storedApiKey.slice(-4)}</span>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href="https://www.assemblyai.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#01A0A9] hover:opacity-80"
+                            title="Get AssemblyAI API Key"
+                          >
+                            <Info className="w-4 h-4" />
+                          </a>
+                          <Button
+                            onClick={handleRemoveApiKey}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-3 text-[#01A0A9] hover:bg-[#01A0A9] hover:text-white text-xs"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    <a
+                      href="https://www.assemblyai.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"
+                    >
+                      Get a free key →
+                    </a>
+                  </Card>
+
+                  {/* AI Summary Card */}
+                  <Card className="p-6 bg-[#F7F9F8] border-[#E5E7EB] rounded-[12px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <Select value={aiProvider} onValueChange={handleAIProviderChange}>
+                        <SelectTrigger className="w-[160px] h-8 border-[#E5E7EB] bg-white">
+                          <SelectValue>
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={getProviderLogo() || "/placeholder.svg"}
+                                alt={getProviderName()}
+                                className="h-4 w-auto"
+                              />
+                            </div>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gemini">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/gemini-logo.png" alt="Google Gemini" className="h-4 w-auto" />
+                              <span className="text-sm">Gemini</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="openai">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/openai-logo.jpg" alt="OpenAI" className="h-4 w-auto" />
+                              <span className="text-sm">OpenAI</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="claude">
+                            <div className="flex items-center gap-2">
+                              <img src="/images/claude-logo.jpg" alt="Claude" className="h-4 w-auto" />
+                              <span className="text-sm">Claude</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm font-semibold text-[#1B1823]">API Key</span>
+                    </div>
+                    <p className="text-sm text-[#39939E] mb-4">
+                      Makes high-quality summaries, insights, and quotes using AI.
+                    </p>
+                    {!isGeminiKeyStored ? (
+                      <div className="space-y-3 mb-4">
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            placeholder="Enter API Key"
+                            value={geminiKey}
+                            onChange={(e) => setGeminiKey(e.target.value)}
+                            className="flex-1 h-9 px-3 border-[#E5E7EB] rounded-[8px] focus:border-[#01A0A9] focus:ring-[#01A0A9] text-[#1B1823] bg-white text-sm"
+                          />
+                          <Button
+                            onClick={handleStoreGeminiKey}
+                            disabled={!geminiKey.trim()}
+                            className="h-9 px-6 bg-[#01A0A9] hover:bg-[#019FA8] text-white rounded-[8px] font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          >
+                            Go
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between h-9 px-3 border border-[#E5E7EB] rounded-[8px] bg-white mb-4">
+                        <span className="text-sm text-[#1B1823]">...{storedGeminiKey.slice(-4)}</span>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={getAPIKeyLink()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#01A0A9] hover:opacity-80"
+                            title={`Get ${getProviderName()} API Key`}
+                          >
+                            <Info className="w-4 h-4" />
+                          </a>
+                          <Button
+                            onClick={handleRemoveGeminiKey}
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-3 text-[#01A0A9] hover:bg-[#01A0A9] hover:text-white text-xs"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    <a
+                      href={getAPIKeyLink()}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center text-[#01A0A9] hover:underline font-medium text-sm"

@@ -3,6 +3,7 @@
 
 const STORAGE_KEY = "supersoniq_api_key"
 const GEMINI_STORAGE_KEY = "supersoniq_gemini_key"
+const AI_PROVIDER_KEY = "supersoniq_ai_provider"
 const ENCRYPTION_KEY = "supersoniq-insights-v1"
 
 // Simple XOR-based encryption (sufficient for localStorage protection)
@@ -72,4 +73,21 @@ export function clearGeminiKey(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(GEMINI_STORAGE_KEY)
   }
+}
+
+// AI Provider functions
+export function storeAIProvider(provider: "gemini" | "openai" | "claude"): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(AI_PROVIDER_KEY, provider)
+  }
+}
+
+export function retrieveAIProvider(): "gemini" | "openai" | "claude" {
+  if (typeof window !== "undefined") {
+    const provider = localStorage.getItem(AI_PROVIDER_KEY)
+    if (provider === "openai" || provider === "claude" || provider === "gemini") {
+      return provider
+    }
+  }
+  return "gemini" // Default to Gemini
 }
