@@ -1,6 +1,7 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "user-research-insights",
+  "version": "1.0.0",
+  "description": "Turn user interview recordings into actionable insights using AI transcription and analysis",
   "private": true,
   "scripts": {
     "build": "next build",

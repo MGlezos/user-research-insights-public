@@ -77,12 +77,54 @@ Think of it as a strong starting point, not a finished platform.
 
 ---
 
+## ⚡︎⚡︎⚡︎ Run locally ⚡︎⚡︎⚡︎
+
+Clone and run the project on your own machine:
+
+```bash
+# Clone the repository
+git clone https://github.com/MGlezos/user-research-insights-public.git
+cd user-research-insights-public
+
+# Install dependencies (using pnpm, npm, or yarn)
+pnpm install
+# or: npm install
+# or: yarn install
+
+# Start the development server
+pnpm dev
+# or: npm run dev
+# or: yarn dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+No environment variables required. API keys are entered directly in the app and stored locally in your browser.
+
+---
+
+## ⚡︎⚡︎⚡︎ Deploy your own ⚡︎⚡︎⚡︎
+
+Deploy to Vercel with one click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/MGlezos/user-research-insights-public)
+
+Or deploy manually:
+
+1. Fork this repository
+2. Connect it to Vercel, Netlify, or your preferred hosting
+3. Deploy (no environment variables needed)
+
+---
+
 ## ⚡︎⚡︎⚡︎ Tech stack ⚡︎⚡︎⚡︎
 
-- V0 for UI and layout
-- Next.js
-- AssemblyAI
-- Claude, Gemini, or OpenAI
+- Next.js 16 with Turbopack
+- React 19
+- Tailwind CSS 4
+- Radix UI components
+- AssemblyAI for transcription
+- Claude, Gemini, or OpenAI for AI analysis
 - Deployed on Vercel
 
 ---
